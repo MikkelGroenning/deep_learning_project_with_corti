@@ -1,5 +1,6 @@
 dependencies:
   - python=3.8.2
+  - notebook
   - pip
   - pip:
     - -r file:requirements.txt

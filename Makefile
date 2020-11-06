@@ -1,4 +1,4 @@
-.PHONY: clean environment requirements
+.PHONY: clean environment requirements updaupdate-environment
 
 #################################################################################
 # GLOBALS                                                                       #
