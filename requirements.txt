@@ -1,4 +1,4 @@
-tweepy
+twarc
 numpy
 pandas
 matplotlib

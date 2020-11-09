@@ -14,7 +14,7 @@ PROJECT_NAME = deep-learning-vlae
 
 ## Update conda environment
 update-environment:
-	conda env update
+	conda env update -n ${PROJECT_NAME}
 
 ## Install conda environment
 environment:
