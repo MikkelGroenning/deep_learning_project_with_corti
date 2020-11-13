@@ -1,3 +1,4 @@
-data/raw/full_dataset_clean.tsv
+data/**
 .DS_Store
 .vscode/settings.json
+credentials.json

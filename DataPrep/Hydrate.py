@@ -1,38 +1,107 @@
-
-from twarc import Twarc
+import collections
+from pickle import PickleError
 import pandas as pd
+from pandas.core.construction import is_empty_data
 import tweepy
 from tqdm import trange
+import time
+import pickle
+import json
+from typing import List
 
-df = pd.read_csv("../Data/Interim/Tweet200316.tsv")
 
-api_key = "vhpYxpHap3JT2knXp3hyiUrJs"
-api_secret_key = "TVsN2J4ZrHEHwrPlhtihuBWolXWibF7878exrK9hQ7zQywq9Dp"
+def _pickle_object(object, path):
 
-bearer_token = "AAAAAAAAAAAAAAAAAAAAAGe7JQEAAAAAxY1bj4PHloQmCG6MXMGiKVoUlyM%3DwLgIydkepC59w4RJ54ghNEuznPUDQkC2yhwr1deQCwwQY02V5L"
-access_token = "1324015519708684289-HBCPYHbS8HPZ0Rq4YY5ZarJvOmei8I"
-access_token_secret = "6NO0tM6dMoapFyCLLFt2OaQJ1xmvO1sUoUmrPJdmmquXx"
+    with open(path, "wb") as f:
+        pickle.dump(object, f)
 
-auth = tweepy.OAuthHandler(api_key, api_secret_key)
-auth.set_access_token(access_token, access_token_secret)
 
-try:
-    redirect_url = auth.get_authorization_url()
-except tweepy.TweepError:
-    print('Error! Failed to get request token.')
+def _unpickle_object(path):
 
-api = tweepy.API(auth)
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
-id_iter = iter(df["tweet_id"])
 
-results = []
+# TODO: Fix files and directories
 
-for i in trange(len(df)//100):
 
-    ids = list(df["tweet_id"].iloc[i*100:i*100+100])
-    response = [
-            (t.id, t.created_at, t.text) 
-            for t in api.statuses_lookup(id_=ids)]
+class Hydrator:
+    def __init__(self) -> None:
+        self.api = get_api()
+        self.backoff_counter = 1
 
-    results.extend(response)
+    def hydrate_tweets_by_date(self, date_string):
 
+        non_hydrated_df = pd.read_csv(f"Data/Interim/Tweet{date_string}.tsv")
+
+        n = len(non_hydrated_df)
+
+        cache_path = f"Data/Interim/hydrated/{date_string}_tmp.pkl"
+        cache_every = 100
+
+        try:
+            i_start, results_so_far = _unpickle_object(cache_path)
+        except FileNotFoundError:
+            i_start, results_so_far = 0, []
+
+        for i in trange(i_start, n // 100 + 1):
+
+            ids = list(non_hydrated_df["tweet_id"].iloc[i * 100 : i * 100 + 100])
+            response = self.get_tweets(ids)
+            results_so_far.extend(response)
+
+            if i % cache_every == cache_every - 1:
+                _pickle_object((i + 1, results_so_far), cache_path)
+
+        hydrated_df = pd.DataFrame.from_records(
+            results_so_far,
+            columns=["tweet_id", "created_at", "text"],
+        )
+        hydrated_df.to_pickle(f"Data/Interim/hydrated/{date_string}.pkl")
+
+    def get_tweets(self, ids: List):
+
+        # Try until the request is succesful
+        while True:
+            try:
+                response = [
+                    (t.id, t.created_at, t.full_text)
+                    for t in self.api.statuses_lookup(id_=ids, tweet_mode="extended")
+                ]
+            except tweepy.TweepError as e:
+                print(e.reason)
+                print("Sleeping for {} seconds".format(60 * self.backoff_counter))
+                time.sleep(60 * self.backoff_counter)
+                self.backoff_counter += 1
+            else:
+                break
+
+        return response
+
+
+def get_api():
+
+    with open("DataPrep/credentials.json") as f:
+        credentials = json.load(f)
+
+    auth = tweepy.OAuthHandler(credentials["api_key"], credentials["api_secret_key"])
+    auth.set_access_token(
+        credentials["access_token"], credentials["access_token_secret"]
+    )
+
+    try:
+        redirect_url = auth.get_authorization_url()  # noqa
+    except tweepy.TweepError:
+        print("Error! Failed to get request token.")
+
+    return tweepy.API(auth, wait_on_rate_limit=True)
+
+
+if __name__ == "__main__":
+
+    dates = ["200316"]
+
+    hydrator = Hydrator()
+
+    for date_string in dates:
+        hydrator.hydrate_tweets_by_date(date_string)
