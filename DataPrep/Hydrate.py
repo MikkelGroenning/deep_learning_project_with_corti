@@ -1,5 +1,4 @@
-
-from twarc import Twarc
+#%%
 import pandas as pd
 import tweepy
 from tqdm import trange
@@ -21,7 +20,7 @@ try:
 except tweepy.TweepError:
     print('Error! Failed to get request token.')
 
-api = tweepy.API(auth)
+api = tweepy.API(auth, wait_on_rate_limit=True)
 
 id_iter = iter(df["tweet_id"])
 
@@ -36,3 +35,12 @@ for i in trange(len(df)//100):
 
     results.extend(response)
 
+#%%
+tweets_200316 = pd.DataFrame(
+    results, columns=['tweet_id', 'date_time', 'tweet']
+)
+
+# %%
+tweets_200316.to_csv('../Data/Interim/Processed_Tweet200316.csv')
+
+# %%
