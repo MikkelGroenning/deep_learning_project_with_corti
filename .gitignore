@@ -1,4 +1,5 @@
-data/**
+!.gitkeep
+Data/*
 .DS_Store
 .vscode/settings.json
 credentials.json

@@ -62,20 +62,25 @@ class Hydrator:
     def get_tweets(self, ids: List):
 
         # Try until the request is succesful
-        while True:
+        try_again = True
+        while try_again:
             try:
                 response = [
                     (t.id, t.created_at, t.full_text)
                     for t in self.api.statuses_lookup(id_=ids, tweet_mode="extended")
                 ]
+                try_again = False
             except tweepy.TweepError as e:
                 print(e.reason)
-                print("Sleeping for {} seconds".format(60 * self.backoff_counter))
-                time.sleep(60 * self.backoff_counter)
-                self.backoff_counter += 1
-            else:
-                break
 
+                if "Failed to send request" in e.reason:
+                    print("Sleeping for 60 seconds")
+                    time.sleep(60)
+                else:
+                    print("Sleeping for {} seconds".format(60 * self.backoff_counter))
+                    time.sleep(60 * self.backoff_counter)
+                    self.backoff_counter += 1
+                
         return response
 
 
