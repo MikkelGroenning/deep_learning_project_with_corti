@@ -62,13 +62,13 @@ class Hydrator:
 
     def hydrate_tweets_by_date(self, date_string):
 
-        cache_path = Path(f"Data/Interim/hydrated/{date_string}_tmp.pkl")
+        cache_path = Path(f"data/interim/hydrated/{date_string}_tmp.pkl")
         cache_every = 100
 
-        non_hydrated_path = Path(f"Data/Interim/Tweet{date_string}.tsv")
+        non_hydrated_path = Path(f"data/interim/Tweet{date_string}.tsv")
         non_hydrated_df = pd.read_csv(non_hydrated_path)
 
-        hydrated_path = Path(f"Data/Interim/hydrated/{date_string}.pkl")
+        hydrated_path = Path(f"data/interim/hydrated/{date_string}.pkl")
         if hydrated_path.is_file():
             _remove_file(cache_path)
             return

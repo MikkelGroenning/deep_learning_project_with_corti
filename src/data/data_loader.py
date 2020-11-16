@@ -10,8 +10,6 @@ from sklearn.decomposition import LatentDirichletAllocation
 from tqdm import tqdm
 
 #%%
-
-
 class TweetDataset(torch.utils.data.Dataset):
 
     def __init__(self, tweets, special_characters = ",._´&’%'\":€$£!?#"):
@@ -67,8 +65,8 @@ class TweetDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         pass
 
-tweets = pd.read_pickle("../data/interim/200316.pkl")
-obj = TweetDataset(tweets)
+# tweets = pd.read_pickle("data/interim/200316.pkl")
+# obj = TweetDataset(tweets)
 
 # %%
 class GenerateNgrams():
@@ -106,42 +104,42 @@ class GenerateNgrams():
 
 
 
-# %%
-ngrams = GenerateNgrams(
-    texts = tweets.text,
-    n = 2
-)
-ngrams.clean_texts()
-ngrams.create_n_grams()
-# %%
-import torch
+# # %%
+# ngrams = GenerateNgrams(
+#     texts = tweets.text,
+#     n = 2
+# )
+# ngrams.clean_texts()
+# ngrams.create_n_grams()
+# # %%
+# import torch
 
 
-class TwitterDataset:
-    """ Twitter dataset """
+# class TwitterDataset:
+#     """ Twitter dataset """
 
-    def __init__(self, file_path):
+#     def __init__(self, file_path):
         
 
-    def __len__(self):
+#     def __len__(self):
 
 
-    def __getitem__(self, idx):
+#     def __getitem__(self, idx):
 
 
 
-#%%
-# Loading step
-def loadall(filename):
-    with open(filename, "rb") as f:
-        while True:
-            try:
-                yield pickle.load(f)
-            except EOFError:
-                break
+# #%%
+# # Loading step
+# def loadall(filename):
+#     with open(filename, "rb") as f:
+#         while True:
+#             try:
+#                 yield pickle.load(f)
+#             except EOFError:
+#                 break
 
-items = loadall("../data/processed/serilized_tweets.pkl")
-# %%
-f = open("../data/processed/serilized_tweets.pkl", "rb")
+# items = loadall("../data/processed/serilized_tweets.pkl")
+# # %%
+# f = open("../data/processed/serilized_tweets.pkl", "rb")
 
-# %%
+# # %%
