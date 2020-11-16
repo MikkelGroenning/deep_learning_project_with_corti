@@ -123,10 +123,12 @@ class Hydrator:
 
 if __name__ == "__main__":
 
-    parser = ArgumentParser()
-    parser.add_argument("dates", nargs="+")
-    args = parser.parse_args()
+    # parser = ArgumentParser()
+    # parser.add_argument("dates", nargs="+")
+    # args = parser.parse_args()
 
+    dates = ["200316"]
     hydrator = Hydrator()
-    for date_string in args.dates:
+    
+    for date_string in dates:
         hydrator.hydrate_tweets_by_date(date_string)
