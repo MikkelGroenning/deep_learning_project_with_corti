@@ -7,3 +7,5 @@ seaborn
 torch
 torchvision
 nltk
+black
+sklearn
