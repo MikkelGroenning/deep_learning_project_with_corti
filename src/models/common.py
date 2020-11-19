@@ -15,6 +15,12 @@ def get_variable(x):
         return x.cuda()
     return x
 
+def get_numpy(x):
+    """ Get numpy array for both cuda and not. """
+    if cuda:
+        return x.cpu().data.numpy()
+    return x.data.numpy()
+
 class OneHotPacked(Module):
 
     def __init__(self, num_classes):

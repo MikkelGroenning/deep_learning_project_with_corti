@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 from src.data.data_loader import TwitterDataset, alphabet, get_loader
-from src.models.common import (EmbeddingPacked, get_variable,
+from src.models.common import (EmbeddingPacked, get_numpy, get_variable,
                                simple_elementwise_apply)
 from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential
 from torch.nn.utils.rnn import pack_sequence
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
     dataset_train = PredictiveDataset(data.iloc[:15000, :].copy())
-    dataset_validation = PredictiveDataset(data.iloc[15000:17000, :].copy())
+    dataset_validation = PredictiveDataset(data.iloc[15000:20000, :].copy())
 
     cuda = torch.cuda.is_available()
     if cuda:
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     else:
         print("Using CPU...")
 
-    batch_size = 5_000
+    batch_size = 100
     train_loader = get_loader(dataset_train, batch_size, pin_memory=cuda)
     validation_loader = get_loader(dataset_validation, batch_size, pin_memory=cuda)
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         net = net.cuda()
 
     # Hyper-parameters
-    num_epochs = 10
+    num_epochs = 2
 
     # Define a loss function and optimizer for this problem
     criterion = CrossEntropyLoss()
@@ -116,7 +116,7 @@ if __name__ == "__main__":
                 # Backward pass
                 loss = criterion(packed_outputs.data, y.data)  
                 # Update loss
-                epoch_validation_loss += loss.detach().numpy()
+                epoch_validation_loss += get_numpy(loss.detach())
             
 
         net.train()
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
-            epoch_training_loss += loss.detach().numpy()
+            epoch_training_loss += get_numpy(loss.detach())
 
         print(f"Epoch {i+1} done!")
         # Save loss for plot
