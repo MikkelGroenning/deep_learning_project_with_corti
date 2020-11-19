@@ -76,7 +76,7 @@ if __name__ == "__main__":
     else:
         print("Using CPU...")
 
-    batch_size = 100
+    batch_size = 5000
     train_loader = get_loader(dataset_train, batch_size, pin_memory=cuda)
     validation_loader = get_loader(dataset_validation, batch_size, pin_memory=cuda)
 

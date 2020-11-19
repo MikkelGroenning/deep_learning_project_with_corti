@@ -3,8 +3,10 @@
  #BSUB -gpu "num=1"
  #BSUB -J toy_example
  #BSUB -n 1
- #BSUB -W 10:00
- #BSUB -R "rusage[mem=32GB]"
+ #BSUB -W 1:00
+ #BSUB -B
+ #BSUB -N
+ #BSUB -R "rusage[mem=8GB]"
  #BSUB -o logs/%J.out
  #BSUB -e logs/%J.err
  
