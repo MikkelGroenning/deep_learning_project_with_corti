@@ -65,8 +65,10 @@ if __name__ == "__main__":
     print("Loading dataset...")
     data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
-    dataset_train = PredictiveDataset(data.iloc[:15000, :].copy())
-    dataset_validation = PredictiveDataset(data.iloc[15000:20000, :].copy())
+    split_idx = int(len(data)*0.7)
+
+    dataset_train = PredictiveDataset(data.iloc[:split_idx, :].copy())
+    dataset_validation = PredictiveDataset(data.iloc[split_idx:, :].copy())
 
     cuda = torch.cuda.is_available()
     if cuda:
@@ -84,7 +86,7 @@ if __name__ == "__main__":
         net = net.cuda()
 
     # Hyper-parameters
-    num_epochs = 2
+    num_epochs = 50
 
     # Define a loss function and optimizer for this problem
     criterion = CrossEntropyLoss()
