@@ -35,20 +35,20 @@ class SimpleRNN(Module):
 
         self.embedding = EmbeddingPacked(
             num_embeddings=len(alphabet),
-            embedding_dim=10,
+            embedding_dim=30,
         )
 
         self.lstm = LSTM(
-            input_size=10,
-            hidden_size=50,
+            input_size=30,
+            hidden_size=150,
             num_layers=1,
             bidirectional=False,
         )
 
         self.dense = Sequential(
-            Linear(in_features=50, out_features=100),
+            Linear(in_features=150, out_features=500),
             ReLU(inplace=True),
-            Linear(in_features=100, out_features=len(alphabet)),
+            Linear(in_features=500, out_features=len(alphabet)),
         )
 
     def forward(self, x):
@@ -86,7 +86,7 @@ if __name__ == "__main__":
         net = net.cuda()
 
     # Hyper-parameters
-    num_epochs = 50
+    num_epochs = 150
 
     # Define a loss function and optimizer for this problem
     criterion = CrossEntropyLoss()
