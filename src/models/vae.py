@@ -162,7 +162,7 @@ if __name__ == "__main__":
                 output = net(x)
                 # Backward pass
                 loss = criterion(
-                    output.view(-1, 57),
+                    output.view(-1, num_classes),
                     pad_packed_sequence(x, total_length=300, padding_value=-1)[0].view(-1)
                 )  
                 # Update loss
