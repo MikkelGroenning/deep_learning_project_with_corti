@@ -54,7 +54,7 @@ class TwitterDataset(torch.utils.data.Dataset):
         )
 
         self.tweets["text"] = (
-            character_set["start_string"] + tweets["text"] + character_set["end_string"]
+            tweets["text"] + character_set["end_string"]
         )
 
         encoded = []
