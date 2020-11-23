@@ -146,4 +146,4 @@ dmypy.json
 cython_debug/
 
 # Model results
-models/
+/models/
