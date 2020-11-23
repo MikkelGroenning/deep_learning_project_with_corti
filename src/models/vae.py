@@ -5,55 +5,101 @@ from pathlib import Path
 import pandas as pd
 import torch
 from src.data.data_loader import TwitterDataset, alphabet, get_loader
-from src.models.common import (EmbeddingPacked, get_numpy, get_variable,
-                               simple_elementwise_apply, cuda)
+from src.models.common import (
+    EmbeddingPacked,
+    get_numpy,
+    get_variable,
+    simple_elementwise_apply,
+    cuda,
+)
 
 from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential
 from torch.nn.utils.rnn import pack_sequence, pad_packed_sequence
 from torch.optim import SGD
+from torch.distributions import Distribution
 
 num_classes = len(alphabet)
+latent_features = 64
+embedding_dim = 10
+max_length = 300
+
+class ReparameterizedDiagonalGaussian(Distribution):
+    """
+    A distribution `N(y | mu, sigma I)` compatible with the reparameterization trick given `epsilon ~ N(0, 1)`.
+    """
+    def __init__(self, mu: Tensor, log_sigma:Tensor):
+        assert mu.shape == log_sigma.shape, f"Tensors `mu` : {mu.shape} and ` log_sigma` : {log_sigma.shape} must be of the same shape"
+        self.mu = mu
+        self.sigma = log_sigma.exp()
+        
+    def sample_epsilon(self) -> Tensor:
+        """`\eps ~ N(0, I)`"""
+        return torch.empty_like(self.mu).normal_()
+        
+    def sample(self) -> Tensor:
+        """sample `z ~ N(z | mu, sigma)` (without gradients)"""
+        with torch.no_grad():
+            return self.rsample()
+        
+    def rsample(self) -> Tensor:
+        """sample `z ~ N(z | mu, sigma)` (with the reparameterization trick) """
+        return self.mu + self.sigma * self.sample_epsilon()
+        
+    def log_prob(self, z:Tensor) -> Tensor:
+        """return the log probability: log `p(z)`"""
+        return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
+
 
 class Encoder(Module):
-
-    def __init__(self, hidden_dim=64, num_layers=2):
+    def __init__(
+        self,
+        embedding_dim=embedding_dim,
+        latent_features=latent_features,
+        hidden_dim=64,
+        num_layers=2,
+    ):
 
         super(Encoder, self).__init__()
-
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.latent_features = latent_features
 
         self.embedding = EmbeddingPacked(
-            num_embeddings = num_classes,
-            embedding_dim = 10,
+            num_embeddings=num_classes,
+            embedding_dim=self.embedding_dim,
         )
 
         self.rnn = LSTM(
-            input_size=10,
-            hidden_size=hidden_dim,
+            input_size=self.embedding_dim,
+            hidden_size=self.hidden_dim,
             num_layers=self.num_layers,
         )
 
-    def forward(self, x):
 
+        # A Gaussian is fully characterised by its mean \mu and variance \sigma**2
+        # Note the 2*latent_features
+        self.ff = Linear(in_features=self.hidden_dim, out_features=2*self.latent_features) 
+        
+
+    def forward(self, x):
         x = self.embedding(x)
         x, (hidden_n, _) = self.rnn(x)
 
-        return hidden_n[-1]
+        return self.ff(hidden_n[-1])
+
 
 # Model defition
 class Decoder(Module):
-    
-    def __init__(self, input_dim=64, max_length=300, num_layers=2):
+    def __init__(self, latent_features=latent_features, max_length=max_length, num_layers=2):
         super(Decoder, self).__init__()
 
         self.max_length = max_length
-        self.input_dim = input_dim
+        self.latent_features = latent_features
         self.n_features = len(alphabet)
 
         self.rnn = LSTM(
-            input_size=self.input_dim,
-            hidden_size=self.input_dim,
-            num_layers=num_layers
+            input_size=self.input_dim, hidden_size=self.input_dim, num_layers=num_layers
         )
 
         self.output_layer = Linear(self.input_dim, self.n_features)
@@ -66,9 +112,9 @@ class Decoder(Module):
 
         return self.output_layer(x)
 
-class RecurrentVariationalAutoencoder(Module):
 
-    def __init__(self, embedding_dim=64, max_length = 300):
+class RecurrentVariationalAutoencoder(Module):
+    def __init__(self, embedding_dim=64, max_length=300):
 
         super(RecurrentVariationalAutoencoder, self).__init__()
         self.embedding_dim = embedding_dim
@@ -76,43 +122,56 @@ class RecurrentVariationalAutoencoder(Module):
         self.encoder = Encoder(self.embedding_dim)
         self.decoder = Decoder(self.embedding_dim, max_length)
 
-        self.hidden2mean = Linear(self.embedding_dim, self.embedding_dim)
-        self.hidden2logv = Linear(self.embedding_dim, self.embedding_dim)
-        # MIGHT be different
-        # https://github.com/timbmg/Sentence-VAE/blob/master/model.py
-        self.latent2hidden = Linear(self.embedding_dim, self.embedding_dim) 
+        # define the parameters of the prior, chosen as p(z) = N(0, I)
+        self.register_buffer('prior_params', torch.zeros(torch.Size([1, 2*latent_features]))
 
-    def reparameterize(self, mu, log_var):
-        """
-        :param mu: mean from the encoder's latent space
-        :param log_var: log variance from the encoder's latent space
-        """
-        std = torch.exp(0.5*log_var) # standard deviation
-        eps = torch.randn_like(std) # `randn_like` as we need the same size
-        sample = mu + (eps * std) # sampling as if coming from the input space
-        return sample
+    def posterior(self, x:Tensor) -> Distribution:
+        """return the distribution `q(x|x) = N(z | \mu(x), \sigma(x))`"""
+        
+        # compute the parameters of the posterior
+        h_x = self.encoder(x)
+        mu, log_sigma = h_x.chunk(2, dim=-1)
+        
+        # return a distribution `q(x|x) = N(z | \mu(x), \sigma(x))`
+        return ReparameterizedDiagonalGaussian(mu, log_sigma)
+    
+    def prior(self, batch_size:int=1) -> Distribution:
+        """return the distribution `p(z)`"""
+        prior_params = self.prior_params.expand(batch_size, *self.prior_params.shape[-1:])
+        mu, log_sigma = prior_params.chunk(2, dim=-1)
+        
+        # return the distribution `p(z)`
+        return ReparameterizedDiagonalGaussian(mu, log_sigma)
+    
+    def observation_model(self, z:Tensor) -> Distribution:
+        """return the distribution `p(x|z)`"""
+        px_logits = self.decoder(z)
+        px_logits = px_logits.view(-1, *self.input_shape) # reshape the output
+        return Bernoulli(logits=px_logits)
 
     def forward(self, x):
 
-        x = self.encoder(x)
+        # define the posterior q(z|x) / encode x into q(z|x)
+        qz = self.posterior(x)
 
-        # Reparameterize 
-        mu = self.hidden2mean(x)
-        log_var = self.hidden2logv(x)
-        z = self.reparameterize(mu, log_var)
+        # define the prior p(z)
+        pz = self.prior(batch_size=x.size(0))
 
-        # DECODER
-        hidden = self.latent2hidden(z)
-        x = self.decoder(hidden)
+        # sample the posterior using the reparameterization trick: z ~ q(z | x)
+        z = qz.rsample()
 
-        return x
+        # define the observation model p(x|z) = B(x | g(z))
+        px = self.observation_model(z)
+        
+        return {'px': px, 'pz': pz, 'qz': qz, 'z': z}
+
 
 if __name__ == "__main__":
 
     print("Loading dataset...")
     data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
-    split_idx = int(len(data)*0.7)
+    split_idx = int(len(data) * 0.7)
 
     dataset_train = TwitterDataset(data.iloc[:split_idx, :].copy())
     dataset_validation = TwitterDataset(data.iloc[split_idx:, :].copy())
@@ -154,20 +213,21 @@ if __name__ == "__main__":
 
             # For each sentence in validation set
             for x in validation_loader:
-                
+
                 # One-hot encode input and target sequence
                 x = get_variable(x)
-            
+
                 # Forward pass
                 output = net(x)
                 # Backward pass
                 loss = criterion(
                     output.view(-1, num_classes),
-                    pad_packed_sequence(x, total_length=300, padding_value=-1)[0].view(-1)
-                )  
+                    pad_packed_sequence(x, total_length=300, padding_value=-1)[0].view(
+                        -1
+                    ),
+                )
                 # Update loss
                 epoch_validation_loss += get_numpy(loss.detach())
-            
 
         net.train()
 
@@ -181,9 +241,9 @@ if __name__ == "__main__":
             # Backward pass
             loss = criterion(
                 output.view(-1, 57),
-                pad_packed_sequence(x, total_length=300, padding_value=-1)[0].view(-1)
-            )  
-            
+                pad_packed_sequence(x, total_length=300, padding_value=-1)[0].view(-1),
+            )
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -202,8 +262,8 @@ if __name__ == "__main__":
     time_string = datetime.now().strftime("%y%m%d_%H%M%S")
 
     with open(model_directory / f"{time_string}_results.json", "w+") as f:
-        json.dump({
-            "training_loss": training_loss,
-            "validation loss": validation_loss}, f)
+        json.dump(
+            {"training_loss": training_loss, "validation loss": validation_loss}, f
+        )
 
     torch.save(net.state_dict(), model_directory / f"{time_string}_state_dict.pt")
