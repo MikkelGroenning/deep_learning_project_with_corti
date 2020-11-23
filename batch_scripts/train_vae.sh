@@ -11,4 +11,4 @@
  #BSUB -e logs/%J.err
  
  echo "Running script..."
- python3 src/models/toy_example.py
+ python3 src/models/vae.py
