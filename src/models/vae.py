@@ -132,7 +132,7 @@ if __name__ == "__main__":
         net = net.cuda()
 
     # Hyper-parameters
-    num_epochs = 10
+    num_epochs = 150
 
     # Define a loss function and optimizer for this problem
     criterion = CrossEntropyLoss(ignore_index=-1)
