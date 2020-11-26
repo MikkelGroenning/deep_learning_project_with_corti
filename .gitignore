@@ -1,4 +1,6 @@
 Data/*
+data/*
+
 .DS_Store
 .vscode/settings.json
 credentials.json
@@ -147,3 +149,6 @@ cython_debug/
 
 # Model results
 /models/
+
+# HPC logs
+/logs/
