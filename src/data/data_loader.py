@@ -10,7 +10,6 @@ special_characters = ",._´&’%'\":€$£!?#"
 character_set = {
     "characters": "abcdefghijklmnopqrstuvwxyz0123456789" + special_characters,
     "unknown": "U",
-    "start_string": "S",
     "end_string": "E",
     "space": " ",
     "user": "@",
