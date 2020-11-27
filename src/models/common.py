@@ -1,9 +1,11 @@
+from pathlib import Path
 from torch.nn.utils.rnn import PackedSequence
 from torch.nn import Module, Embedding
 import torch.nn.functional as FF
 import torch
 
 cuda = torch.cuda.is_available()
+model_directory = Path(".") / "models"
 
 def simple_elementwise_apply(fn, packed_sequence):
     """applies a pointwise function fn to each element in packed_sequence"""
@@ -38,3 +40,42 @@ class EmbeddingPacked(Module):
 
     def forward(self, x):
         return simple_elementwise_apply(self.embedding, x)
+
+
+def save_checkpoint(
+    model_name,
+    epoch,
+    model,
+    optimizer,
+    training_loss,
+    validation_loss,
+):
+
+    loc = model_directory / model_name
+    loc.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "training_loss": training_loss,
+            "validation_loss": validation_loss,
+        },
+        loc / "checkpoint.pt",
+    )
+
+def get_checkpoint(model_name):
+
+    if cuda:
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+
+    try:
+        checkpoint = torch.load(
+            model_directory / model_name / "checkpoint.pt",
+            map_location=device
+            )
+        return checkpoint
+    except FileNotFoundError:
+        return None
