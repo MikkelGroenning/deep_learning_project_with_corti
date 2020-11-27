@@ -1,9 +1,9 @@
  #!/bin/sh
  #BSUB -q gpuv100
  #BSUB -gpu "num=1"
- #BSUB -J toy_example
+ #BSUB -J train_rvae
  #BSUB -n 1
- #BSUB -W 1:00
+ #BSUB -W 5:00
  #BSUB -B
  #BSUB -N
  #BSUB -R "rusage[mem=8GB]"
@@ -11,4 +11,4 @@
  #BSUB -e logs/%J.err
  
  echo "Running script..."
- python3 src/models/vae.py
+ python3 src/models/rvae.py
