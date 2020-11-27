@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import sys
 from typing import Dict, Tuple
 from itertools import chain
 import numpy as np
@@ -20,6 +21,7 @@ from src.models.common import (
     cuda,
 )
 
+import json
 from torch import Tensor
 from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential
 from torch.nn.utils.rnn import pack_padded_sequence, pack_sequence, pad_packed_sequence
@@ -131,7 +133,8 @@ class Decoder(Module):
         # waste some memory, but not much
         x = x.repeat(len(batch_sizes), 1, 1)
 
-        # And now for the tricky part
+        # And now for the tricky part 
+        # (calculating sequence lengths from batch sizes)
         lengths = -np.diff(np.append(batch_sizes.numpy(), 0))
         sequence_lengths = list(
             chain.from_iterable(n * [i + 1] for i, n in enumerate(lengths) if n)
@@ -187,8 +190,9 @@ class RecurrentVariationalAutoencoder(Module):
     def observation_model(self, z: Tensor, batch_sizes: Tensor) -> Distribution:
         """return the distribution `p(x|z)`"""
 
-        px_logits = self.decoder(z, batch_sizes)
-        return Categorical(logits=px_logits)
+        px_logits = self.decoder(z, batch_sizes) # packedsequence
+
+        return Categorical(logits=px_logits.data)
 
     def forward(self, x):
 
@@ -220,13 +224,10 @@ class VariationalInference(Module):
         # unpack outputs
         px, pz, qz, z = [outputs[k] for k in ["px", "pz", "qz", "z"]]
 
-        # evaluate log probabilities
-        x_padded, batch_sizes = pad_packed_sequence(
-            x, total_length=300, padding_value=character_to_number["P"]
-        )
-        log_px = px.log_prob(x_padded).sum(dim=0)
-        log_pz = pz.log_prob(z).sum(dim=1)
-        log_qz = qz.log_prob(z).sum(dim=1)
+        log_px = px.log_prob(x.data).sum() / len(z)
+
+        log_pz = pz.log_prob(z).mean()
+        log_qz = qz.log_prob(z).mean()
 
         # compute the ELBO with and without the beta parameter:
         # `L^\beta = E_q [ log p(x|z) - \beta * D_KL(q(z|x) | p(z))`
@@ -236,7 +237,7 @@ class VariationalInference(Module):
         elbo = log_px - kl
         beta_elbo = log_px - self.beta * kl
 
-        loss = -beta_elbo.sum()
+        loss = -beta_elbo
 
         # prepare the output
         with torch.no_grad():
@@ -259,56 +260,55 @@ if __name__ == "__main__":
         print("Using CUDA...")
     else:
         print("Using CPU...")
+    sys.stdout.flush()
 
-    batch_size = 5000
+    batch_size = 2000
+    
     train_loader = get_loader(dataset_train, batch_size, pin_memory=cuda)
     validation_loader = get_loader(dataset_validation, batch_size, pin_memory=cuda)
 
-    net = RecurrentVariationalAutoencoder()
+    rvae = RecurrentVariationalAutoencoder()
+    vi = VariationalInference()
 
     if cuda:
-        net = net.cuda()
+        rvae = rvae.cuda()
 
     # Hyper-parameters
-    num_epochs = 10
+    num_epochs = 150
 
-    # Define a loss function and optimizer for this problem
-    criterion = CrossEntropyLoss(ignore_index=-1)
-    optimizer = SGD(net.parameters(), lr=0.01, momentum=0.9)
+    # Define an optimizer for this problem
+    optimizer = Adam(rvae.parameters(), lr=0.001)
 
     # Track loss
     training_loss, validation_loss = [], []
 
+    
     # For each epoch
     for i in range(num_epochs):
 
-        # Track loss
-        epoch_training_loss = 0
-        epoch_validation_loss = 0
+        # Track loss per batch
+        epoch_training_loss = []
+        epoch_validation_loss = []
 
-        net.eval()
+        rvae.eval()
 
         with torch.no_grad():
 
             # For each sentence in validation set
             for x in validation_loader:
 
-                # One-hot encode input and target sequence
                 x = get_variable(x)
 
-                # Forward pass
-                output = net(x)
-                # Backward pass
-                loss = criterion(
-                    output.view(-1, num_classes),
-                    pad_packed_sequence(x, total_length=300, padding_value=-1)[0].view(
-                        -1
-                    ),
-                )
-                # Update loss
-                epoch_validation_loss += get_numpy(loss.detach())
+                # Variational inference
+                loss, diagnostics, outputs = vi(rvae, x)
 
-        net.train()
+                # Update loss
+                epoch_validation_loss.append((
+                    x.batch_sizes[0].numpy(),
+                    get_numpy(loss.detach()),
+                ))
+
+        rvae.train()
 
         # For each sentence in training set
         for x in train_loader:
@@ -316,25 +316,31 @@ if __name__ == "__main__":
             x = get_variable(x)
 
             # Forward pass
-            output = net(x)
-            # Backward pass
-            loss = criterion(
-                output.view(-1, 57),
-                pad_packed_sequence(x, total_length=300, padding_value=-1)[0].view(-1),
-            )
+            loss, diagnostics, outputs = vi(rvae, x)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            epoch_training_loss += get_numpy(loss.detach())
+            epoch_training_loss.append((
+                x.batch_sizes[0].numpy(),
+                get_numpy(loss.detach()),
+            ))
+
+
+        # Save loss for plot
+        weigths, batch_average = zip(*epoch_training_loss)
+        training_loss.append(np.average(batch_average, weights=weigths))
+
+        weigths, batch_average = zip(*epoch_validation_loss)
+        validation_loss.append(np.average(batch_average, weights=weigths))
 
         print(f"Epoch {i+1} done!")
-        # Save loss for plot
-        training_loss.append(epoch_training_loss / len(dataset_train))
-        validation_loss.append(epoch_validation_loss / len(dataset_validation))
+        print(f"T. loss: {training_loss[-1]}")
+        print(f"V. loss: {validation_loss[-1]}")
+        sys.stdout.flush()
 
-    model_name = net.__class__.__name__
+    model_name = rvae.__class__.__name__
     model_directory = Path(f"./models/{model_name}/")
     model_directory.mkdir(parents=True, exist_ok=True)
 
@@ -345,4 +351,4 @@ if __name__ == "__main__":
             {"training_loss": training_loss, "validation loss": validation_loss}, f
         )
 
-    torch.save(net.state_dict(), model_directory / f"{time_string}_state_dict.pt")
+    torch.save(rvae.state_dict(), model_directory / f"{time_string}_state_dict.pt")
