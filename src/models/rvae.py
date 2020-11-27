@@ -236,8 +236,8 @@ model_name = "RecurrentVariationalAutoencoder"
 model_parameters = {}
 
 # Training parameters
-batch_size = 100
-max_epochs = 10
+batch_size = 2000
+max_epochs = 150
 
 optimizer_parameters = {"lr": 0.001}
 
