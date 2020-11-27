@@ -1,38 +1,25 @@
-from datetime import datetime
-from pathlib import Path
 import sys
-from typing import Dict, Tuple
 from itertools import chain
+from typing import Dict, Tuple
+
 import numpy as np
 import pandas as pd
 import torch
-from torch.distributions.categorical import Categorical
-from src.data.data_loader import (
-    TwitterDataset,
-    alphabet,
-    get_loader,
-    character_to_number,
-)
-from src.models.common import (
-    EmbeddingPacked,
-    get_numpy,
-    get_variable,
-    simple_elementwise_apply,
-    cuda,
-)
-
-import json
+from src.data.data_loader import TwitterDataset, alphabet, get_loader
+from src.models.common import (EmbeddingPacked, cuda, get_checkpoint,
+                               get_numpy, get_variable, save_checkpoint,
+                               simple_elementwise_apply)
 from torch import Tensor
-from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential
-from torch.nn.utils.rnn import pack_padded_sequence, pack_sequence, pad_packed_sequence
-from torch.optim import SGD, Adam
-from torch.distributions import Distribution, Bernoulli
+from torch.distributions import Distribution
+from torch.distributions.categorical import Categorical
+from torch.nn import LSTM, Linear, Module
+from torch.nn.utils.rnn import pack_padded_sequence
+from torch.optim import Adam
 
 num_classes = len(alphabet)
 latent_features = 64
 embedding_dim = 10
 max_length = 300
-
 
 class ReparameterizedDiagonalGaussian(Distribution):
     """
@@ -104,7 +91,6 @@ class Encoder(Module):
         return self.ff(hidden_n[-1])
 
 
-# Model defition
 class Decoder(Module):
     def __init__(
         self,
@@ -133,7 +119,7 @@ class Decoder(Module):
         # waste some memory, but not much
         x = x.repeat(len(batch_sizes), 1, 1)
 
-        # And now for the tricky part 
+        # And now for the tricky part
         # (calculating sequence lengths from batch sizes)
         lengths = -np.diff(np.append(batch_sizes.numpy(), 0))
         sequence_lengths = list(
@@ -190,7 +176,7 @@ class RecurrentVariationalAutoencoder(Module):
     def observation_model(self, z: Tensor, batch_sizes: Tensor) -> Distribution:
         """return the distribution `p(x|z)`"""
 
-        px_logits = self.decoder(z, batch_sizes) # packedsequence
+        px_logits = self.decoder(z, batch_sizes)  # packedsequence
 
         return Categorical(logits=px_logits.data)
 
@@ -245,6 +231,27 @@ class VariationalInference(Module):
 
         return loss, diagnostics, outputs
 
+model_name = "RecurrentVariationalAutoencoder"
+# Default, should probably be explicit
+model_parameters = {}
+
+# Training parameters
+batch_size = 100
+max_epochs = 10
+
+optimizer_parameters = {"lr": 0.001}
+
+def get_model():
+
+    try:
+        checkpoint = get_checkpoint(model_name)
+    except FileNotFoundError:
+        print("Model not trained yet")
+        return None
+
+    model = RecurrentVariationalAutoencoder(**model_parameters)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    return model
 
 if __name__ == "__main__":
 
@@ -262,35 +269,38 @@ if __name__ == "__main__":
         print("Using CPU...")
     sys.stdout.flush()
 
-    batch_size = 2000
-    
+    vi = VariationalInference()
+
+    model = RecurrentVariationalAutoencoder(**model_parameters)
+    optimizer = Adam(model.parameters(), **optimizer_parameters)
+
+    checkpoint = get_checkpoint(model_name)
+
+    if checkpoint is not None:
+        current_epoch = checkpoint["epoch"]
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        training_loss = checkpoint["training_loss"]
+        validation_loss = checkpoint["validation_loss"]
+    else:
+        current_epoch = -1
+        training_loss = []
+        validation_loss = []
+
     train_loader = get_loader(dataset_train, batch_size, pin_memory=cuda)
     validation_loader = get_loader(dataset_validation, batch_size, pin_memory=cuda)
 
-    rvae = RecurrentVariationalAutoencoder()
-    vi = VariationalInference()
-
     if cuda:
-        rvae = rvae.cuda()
+        model = model.cuda()
 
-    # Hyper-parameters
-    num_epochs = 150
-
-    # Define an optimizer for this problem
-    optimizer = Adam(rvae.parameters(), lr=0.001)
-
-    # Track loss
-    training_loss, validation_loss = [], []
-
-    
     # For each epoch
-    for i in range(num_epochs):
+    for epoch in range(current_epoch + 1, max_epochs):
 
         # Track loss per batch
         epoch_training_loss = []
         epoch_validation_loss = []
 
-        rvae.eval()
+        model.eval()
 
         with torch.no_grad():
 
@@ -300,15 +310,17 @@ if __name__ == "__main__":
                 x = get_variable(x)
 
                 # Variational inference
-                loss, diagnostics, outputs = vi(rvae, x)
+                loss, diagnostics, outputs = vi(model, x)
 
                 # Update loss
-                epoch_validation_loss.append((
-                    x.batch_sizes[0].numpy(),
-                    get_numpy(loss.detach()),
-                ))
+                epoch_validation_loss.append(
+                    (
+                        x.batch_sizes[0].numpy(),
+                        get_numpy(loss.detach()),
+                    )
+                )
 
-        rvae.train()
+        model.train()
 
         # For each sentence in training set
         for x in train_loader:
@@ -316,17 +328,18 @@ if __name__ == "__main__":
             x = get_variable(x)
 
             # Forward pass
-            loss, diagnostics, outputs = vi(rvae, x)
+            loss, diagnostics, outputs = vi(model, x)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            epoch_training_loss.append((
-                x.batch_sizes[0].numpy(),
-                get_numpy(loss.detach()),
-            ))
-
+            epoch_training_loss.append(
+                (
+                    x.batch_sizes[0].numpy(),
+                    get_numpy(loss.detach()),
+                )
+            )
 
         # Save loss for plot
         weigths, batch_average = zip(*epoch_training_loss)
@@ -335,20 +348,16 @@ if __name__ == "__main__":
         weigths, batch_average = zip(*epoch_validation_loss)
         validation_loss.append(np.average(batch_average, weights=weigths))
 
-        print(f"Epoch {i+1} done!")
+        print(f"Epoch {epoch+1} done!")
         print(f"T. loss: {training_loss[-1]}")
         print(f"V. loss: {validation_loss[-1]}")
         sys.stdout.flush()
 
-    model_name = rvae.__class__.__name__
-    model_directory = Path(f"./models/{model_name}/")
-    model_directory.mkdir(parents=True, exist_ok=True)
-
-    time_string = datetime.now().strftime("%y%m%d_%H%M%S")
-
-    with open(model_directory / f"{time_string}_results.json", "w+") as f:
-        json.dump(
-            {"training_loss": training_loss, "validation loss": validation_loss}, f
+        save_checkpoint(
+            model_name=model_name,
+            epoch=epoch,
+            model=model,
+            optimizer=optimizer,
+            training_loss=training_loss,
+            validation_loss=validation_loss,
         )
-
-    torch.save(rvae.state_dict(), model_directory / f"{time_string}_state_dict.pt")
