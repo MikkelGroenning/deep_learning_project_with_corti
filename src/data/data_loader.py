@@ -11,7 +11,6 @@ character_set = {
     "characters": "abcdefghijklmnopqrstuvwxyz0123456789" + special_characters,
     "unknown": "U",
     "end_string": "E",
-    "padding_token": "P",
     "space": " ",
     "user": "@",
 }
