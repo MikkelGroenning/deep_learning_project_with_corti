@@ -10,8 +10,8 @@ special_characters = ",._´&’%'\":€$£!?#"
 character_set = {
     "characters": "abcdefghijklmnopqrstuvwxyz0123456789" + special_characters,
     "unknown": "U",
-    "start_string": "S",
     "end_string": "E",
+    "padding_token": "P",
     "space": " ",
     "user": "@",
 }
@@ -54,7 +54,7 @@ class TwitterDataset(torch.utils.data.Dataset):
         )
 
         self.tweets["text"] = (
-            character_set["start_string"] + tweets["text"] + character_set["end_string"]
+            tweets["text"] + character_set["end_string"]
         )
 
         encoded = []

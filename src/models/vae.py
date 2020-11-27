@@ -1,10 +1,11 @@
-import json
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Tuple
 
 import pandas as pd
 import torch
-from src.data.data_loader import TwitterDataset, alphabet, get_loader
+from torch.distributions.categorical import Categorical
+from src.data.data_loader import TwitterDataset, alphabet, get_loader, character_to_number
 from src.models.common import (
     EmbeddingPacked,
     get_numpy,
@@ -13,39 +14,44 @@ from src.models.common import (
     cuda,
 )
 
+from torch import Tensor
 from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential
-from torch.nn.utils.rnn import pack_sequence, pad_packed_sequence
-from torch.optim import SGD
-from torch.distributions import Distribution
+from torch.nn.utils.rnn import pack_padded_sequence, pack_sequence, pad_packed_sequence
+from torch.optim import SGD, Adam
+from torch.distributions import Distribution, Bernoulli
 
 num_classes = len(alphabet)
 latent_features = 64
 embedding_dim = 10
 max_length = 300
 
+
 class ReparameterizedDiagonalGaussian(Distribution):
     """
     A distribution `N(y | mu, sigma I)` compatible with the reparameterization trick given `epsilon ~ N(0, 1)`.
     """
-    def __init__(self, mu: Tensor, log_sigma:Tensor):
-        assert mu.shape == log_sigma.shape, f"Tensors `mu` : {mu.shape} and ` log_sigma` : {log_sigma.shape} must be of the same shape"
+
+    def __init__(self, mu: Tensor, log_sigma: Tensor):
+        assert (
+            mu.shape == log_sigma.shape
+        ), f"Tensors `mu` : {mu.shape} and ` log_sigma` : {log_sigma.shape} must be of the same shape"
         self.mu = mu
         self.sigma = log_sigma.exp()
-        
+
     def sample_epsilon(self) -> Tensor:
         """`\eps ~ N(0, I)`"""
         return torch.empty_like(self.mu).normal_()
-        
+
     def sample(self) -> Tensor:
         """sample `z ~ N(z | mu, sigma)` (without gradients)"""
         with torch.no_grad():
             return self.rsample()
-        
+
     def rsample(self) -> Tensor:
         """sample `z ~ N(z | mu, sigma)` (with the reparameterization trick) """
         return self.mu + self.sigma * self.sample_epsilon()
-        
-    def log_prob(self, z:Tensor) -> Tensor:
+
+    def log_prob(self, z: Tensor) -> Tensor:
         """return the log probability: log `p(z)`"""
         return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
 
@@ -76,13 +82,14 @@ class Encoder(Module):
             num_layers=self.num_layers,
         )
 
-
         # A Gaussian is fully characterised by its mean \mu and variance \sigma**2
         # Note the 2*latent_features
-        self.ff = Linear(in_features=self.hidden_dim, out_features=2*self.latent_features) 
-        
+        self.ff = Linear(
+            in_features=self.hidden_dim, out_features=2 * self.latent_features
+        )
 
     def forward(self, x):
+
         x = self.embedding(x)
         x, (hidden_n, _) = self.rnn(x)
 
@@ -91,18 +98,27 @@ class Encoder(Module):
 
 # Model defition
 class Decoder(Module):
-    def __init__(self, latent_features=latent_features, max_length=max_length, num_layers=2):
+    def __init__(
+        self,
+        latent_features=latent_features,
+        hidden_size=64,
+        max_length=max_length,
+        num_layers=2,
+    ):
         super(Decoder, self).__init__()
 
         self.max_length = max_length
         self.latent_features = latent_features
+        self.hidden_size = hidden_size
         self.n_features = len(alphabet)
 
         self.rnn = LSTM(
-            input_size=self.input_dim, hidden_size=self.input_dim, num_layers=num_layers
+            input_size=self.latent_features,
+            hidden_size=self.latent_features,
+            num_layers=num_layers,
         )
 
-        self.output_layer = Linear(self.input_dim, self.n_features)
+        self.output_layer = Linear(hidden_size, self.n_features)
 
     def forward(self, x):
 
@@ -114,40 +130,50 @@ class Decoder(Module):
 
 
 class RecurrentVariationalAutoencoder(Module):
-    def __init__(self, embedding_dim=64, max_length=300):
+
+    def __init__(self, latent_features=64, max_length=300):
 
         super(RecurrentVariationalAutoencoder, self).__init__()
-        self.embedding_dim = embedding_dim
 
-        self.encoder = Encoder(self.embedding_dim)
-        self.decoder = Decoder(self.embedding_dim, max_length)
+        self.latent_features = latent_features
+
+        self.encoder = Encoder(self.latent_features)
+        self.decoder = Decoder(
+            latent_features=self.latent_features, 
+            hidden_size=64,
+            max_length=max_length,
+            num_layers=2,
+            )
 
         # define the parameters of the prior, chosen as p(z) = N(0, I)
-        self.register_buffer('prior_params', torch.zeros(torch.Size([1, 2*latent_features]))
+        self.register_buffer(
+            "prior_params", torch.zeros(torch.Size([1, 2 * latent_features]))
+        )
 
-    def posterior(self, x:Tensor) -> Distribution:
-        """return the distribution `q(x|x) = N(z | \mu(x), \sigma(x))`"""
-        
+    def posterior(self, x: Tensor) -> Distribution:
+        """return the distribution `q(z|x) = N(z | \mu(x), \sigma(x))`"""
+
         # compute the parameters of the posterior
         h_x = self.encoder(x)
         mu, log_sigma = h_x.chunk(2, dim=-1)
-        
-        # return a distribution `q(x|x) = N(z | \mu(x), \sigma(x))`
+
+        # return a distribution `q(z|x) = N(z | \mu(x), \sigma(x))`
         return ReparameterizedDiagonalGaussian(mu, log_sigma)
-    
-    def prior(self, batch_size:int=1) -> Distribution:
+
+    def prior(self, batch_size: int = 1) -> Distribution:
         """return the distribution `p(z)`"""
-        prior_params = self.prior_params.expand(batch_size, *self.prior_params.shape[-1:])
+        prior_params = self.prior_params.expand(
+            batch_size, *self.prior_params.shape[-1:]
+        )
         mu, log_sigma = prior_params.chunk(2, dim=-1)
-        
+
         # return the distribution `p(z)`
         return ReparameterizedDiagonalGaussian(mu, log_sigma)
-    
-    def observation_model(self, z:Tensor) -> Distribution:
+
+    def observation_model(self, z: Tensor) -> Distribution:
         """return the distribution `p(x|z)`"""
         px_logits = self.decoder(z)
-        px_logits = px_logits.view(-1, *self.input_shape) # reshape the output
-        return Bernoulli(logits=px_logits)
+        return Categorical(logits=px_logits)
 
     def forward(self, x):
 
@@ -155,16 +181,56 @@ class RecurrentVariationalAutoencoder(Module):
         qz = self.posterior(x)
 
         # define the prior p(z)
-        pz = self.prior(batch_size=x.size(0))
+        pz = self.prior(batch_size=x.batch_sizes[0])
 
         # sample the posterior using the reparameterization trick: z ~ q(z | x)
         z = qz.rsample()
 
         # define the observation model p(x|z) = B(x | g(z))
         px = self.observation_model(z)
-        
-        return {'px': px, 'pz': pz, 'qz': qz, 'z': z}
 
+        return {"px": px, "pz": pz, "qz": qz, "z": z}
+
+
+class VariationalInference(Module):
+
+    def __init__(self, beta:float=1.):
+        super().__init__()
+        self.beta = beta
+        
+    def forward(self, model:Module, x:Tensor) -> Tuple[Tensor, Dict]:
+        
+        # forward pass through the model
+        outputs = model(x)
+        
+        # unpack outputs
+        px, pz, qz, z = [outputs[k] for k in ["px", "pz", "qz", "z"]]
+        
+        # evaluate log probabilities
+        x_padded, batch_sizes = pad_packed_sequence(
+            x, 
+            total_length=300, 
+            padding_value=character_to_number['P']
+        )
+        log_px = px.log_prob(x_padded).sum(dim=0)
+        log_pz = pz.log_prob(z).sum(dim=1)
+        log_qz = qz.log_prob(z).sum(dim=1)
+
+        # compute the ELBO with and without the beta parameter: 
+        # `L^\beta = E_q [ log p(x|z) - \beta * D_KL(q(z|x) | p(z))`
+        # where `D_KL(q(z|x) | p(z)) = log q(z|x) - log p(z)`
+        kl = log_qz - log_pz
+
+        elbo = log_px - kl
+        beta_elbo = log_px - self.beta * kl
+
+        loss = -beta_elbo.sum()
+
+        # prepare the output
+        with torch.no_grad():
+            diagnostics = {'elbo': elbo, 'log_px':log_px, 'kl': kl}
+            
+        return loss, diagnostics, outputs
 
 if __name__ == "__main__":
 
