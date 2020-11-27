@@ -2,6 +2,7 @@ tweepy
 tqdm
 numpy
 pandas
+gensim
 matplotlib
 seaborn
 torch
