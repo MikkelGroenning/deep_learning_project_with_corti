@@ -232,7 +232,7 @@ model_parameters = {}
 
 # Training parameters
 batch_size = 2000
-max_epochs = 605
+max_epochs = 600
 
 optimizer_parameters = {"lr": 0.001}
 
