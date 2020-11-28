@@ -5,7 +5,8 @@ import torch.nn.functional as FF
 import torch
 
 cuda = torch.cuda.is_available()
-model_directory = Path(".") / "models"
+
+model_directory = Path(__file__).parent /".." / ".." / "models"
 
 def simple_elementwise_apply(fn, packed_sequence):
     """applies a pointwise function fn to each element in packed_sequence"""
