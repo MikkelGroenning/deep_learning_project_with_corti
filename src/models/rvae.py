@@ -5,7 +5,8 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 import torch
-from src.data.data_loader import TwitterDataset, alphabet, get_loader
+from src.data.characters import TwitterDatasetCharacter, alphabet
+from src.data.common import get_loader
 from src.models.common import (EmbeddingPacked, cuda, get_checkpoint,
                                get_numpy, get_variable, save_checkpoint,
                                simple_elementwise_apply)
@@ -46,7 +47,6 @@ class ReparameterizedDiagonalGaussian(Distribution):
     def log_prob(self, z: Tensor) -> Tensor:
         """return the log probability: log `p(z)`"""
         return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
-
 
 class Encoder(Module):
     def __init__(
@@ -232,7 +232,7 @@ model_parameters = {}
 
 # Training parameters
 batch_size = 2000
-max_epochs = 600
+max_epochs = 605
 
 optimizer_parameters = {"lr": 0.001}
 
@@ -255,8 +255,8 @@ if __name__ == "__main__":
 
     split_idx = int(len(data) * 0.7)
 
-    dataset_train = TwitterDataset(data.iloc[:split_idx, :].copy())
-    dataset_validation = TwitterDataset(data.iloc[split_idx:, :].copy())
+    dataset_train = TwitterDatasetCharacter(data.iloc[:split_idx, :].copy())
+    dataset_validation = TwitterDatasetCharacter(data.iloc[split_idx:, :].copy())
 
     if cuda:
         print("Using CUDA...")

@@ -32,8 +32,8 @@ regex_links = re.compile("http\S+")
 regex_whitespace = re.compile("[\s|-]+")
 regex_unknown = re.compile(f"[^{alphabet}]+")
 
-
-class TwitterDataset(torch.utils.data.Dataset):
+class TwitterDatasetCharacter(torch.utils.data.Dataset):
+    
     def __init__(self, tweets):
 
         self.tweets = tweets
@@ -71,14 +71,3 @@ class TwitterDataset(torch.utils.data.Dataset):
         return pack_sequence(sorted(values, key=lambda x: -len(x)))
 
 
-def get_loader(dataset, batch_size, pin_memory=False):
-
-    sampler = BatchSampler(
-        RandomSampler(dataset), batch_size=batch_size, drop_last=False
-    )
-    return DataLoader(
-        dataset,
-        batch_size=None,
-        sampler=sampler,
-        pin_memory=pin_memory,
-    )
