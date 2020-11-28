@@ -17,9 +17,6 @@ from torch.nn.utils.rnn import pack_padded_sequence
 from torch.optim import Adam
 
 num_classes = len(alphabet)
-latent_features = 64
-embedding_dim = 10
-max_length = 300
 
 class ReparameterizedDiagonalGaussian(Distribution):
     """
@@ -54,15 +51,15 @@ class ReparameterizedDiagonalGaussian(Distribution):
 class Encoder(Module):
     def __init__(
         self,
-        embedding_dim=embedding_dim,
-        latent_features=latent_features,
-        hidden_dim=64,
+        embedding_dim=10,
+        latent_features=64,
+        hidden_size=64,
         num_layers=2,
     ):
 
         super(Encoder, self).__init__()
         self.embedding_dim = embedding_dim
-        self.hidden_dim = hidden_dim
+        self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.latent_features = latent_features
 
@@ -73,14 +70,14 @@ class Encoder(Module):
 
         self.rnn = LSTM(
             input_size=self.embedding_dim,
-            hidden_size=self.hidden_dim,
+            hidden_size=self.hidden_size,
             num_layers=self.num_layers,
         )
 
         # A Gaussian is fully characterised by its mean \mu and variance \sigma**2
         # Note the 2*latent_features
         self.ff = Linear(
-            in_features=self.hidden_dim, out_features=2 * self.latent_features
+            in_features=self.hidden_size, out_features=2 * self.latent_features
         )
 
     def forward(self, x):
@@ -94,14 +91,12 @@ class Encoder(Module):
 class Decoder(Module):
     def __init__(
         self,
-        latent_features=latent_features,
+        latent_features=64,
         hidden_size=64,
-        max_length=max_length,
         num_layers=2,
     ):
         super(Decoder, self).__init__()
 
-        self.max_length = max_length
         self.latent_features = latent_features
         self.hidden_size = hidden_size
         self.n_features = len(alphabet)
@@ -134,7 +129,8 @@ class Decoder(Module):
 
 
 class RecurrentVariationalAutoencoder(Module):
-    def __init__(self, latent_features=64, max_length=300):
+
+    def __init__(self, latent_features=64):
 
         super(RecurrentVariationalAutoencoder, self).__init__()
 
@@ -144,7 +140,6 @@ class RecurrentVariationalAutoencoder(Module):
         self.decoder = Decoder(
             latent_features=self.latent_features,
             hidden_size=64,
-            max_length=max_length,
             num_layers=2,
         )
 
@@ -237,7 +232,7 @@ model_parameters = {}
 
 # Training parameters
 batch_size = 2000
-max_epochs = 150
+max_epochs = 600
 
 optimizer_parameters = {"lr": 0.001}
 
@@ -277,6 +272,7 @@ if __name__ == "__main__":
     checkpoint = get_checkpoint(model_name)
 
     if checkpoint is not None:
+        print("Continuing from previously trained model")
         current_epoch = checkpoint["epoch"]
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -291,7 +287,12 @@ if __name__ == "__main__":
     validation_loader = get_loader(dataset_validation, batch_size, pin_memory=cuda)
 
     if cuda:
-        model = model.cuda()
+        model.to(torch.device("cuda"))
+        # Fix for optimizer on cpu
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
 
     # For each epoch
     for epoch in range(current_epoch + 1, max_epochs):
