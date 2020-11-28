@@ -129,14 +129,10 @@ model_parameters = {}
 
 # Training parameters
 
-batch_size = 200
-max_epochs = 5
-
-# batch_size = 2000
-# max_epochs = 605
+batch_size = 2000
+max_epochs = 10
 
 optimizer_parameters = {"lr": 0.001}
-
 
 def get_model():
 
@@ -156,13 +152,10 @@ if __name__ == "__main__":
     print("Loading dataset...")
     data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
-    # split_idx = int(len(data) * 0.7)
+    split_idx = int(len(data) * 0.7)
 
-    # dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
-    # dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
-
-    dataset_train = TwitterDatasetChar(data.iloc[:1000, :].copy())
-    dataset_validation = TwitterDatasetChar(data.iloc[1000:1200, :].copy())
+    dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
+    dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
 
     if cuda:
         print("Using CUDA...")
