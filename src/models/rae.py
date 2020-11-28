@@ -10,10 +10,7 @@ from src.data.characters import TwitterDatasetChar, alphabet
 from src.data.common import get_loader
 
 from src.models.common import (
-    EmbeddingPacked,
-    get_checkpoint,
-    get_numpy,
-    get_variable, save_checkpoint,
+    EmbeddingPacked, ModelTrainer,
     simple_elementwise_apply,
     cuda,
 )
@@ -123,7 +120,20 @@ class RecurrentAutoencoder(Module):
         return x
 
 
-model_name = "RecurrentAutoencoder"
+class RAETrainer(ModelTrainer):
+
+    def __init__(self, criterion, *args, **kwargs):
+
+        super(RAETrainer, self).__init__(*args, **kwargs)
+        self.criterion = criterion
+
+    def get_loss(self, x):
+
+        output = self.model(x)
+        loss = self.criterion(output.data, x.data) / x.batch_sizes[0]
+
+        return loss
+
 # Default, should probably be explicit
 model_parameters = {}
 
@@ -133,19 +143,6 @@ batch_size = 2000
 max_epochs = 600
 
 optimizer_parameters = {"lr": 0.001}
-
-def get_model():
-
-    try:
-        checkpoint = get_checkpoint(model_name)
-    except FileNotFoundError:
-        print("Model not trained yet")
-        return None
-
-    model = RecurrentAutoencoder(**model_parameters)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    return model
-
 
 if __name__ == "__main__":
 
@@ -157,113 +154,19 @@ if __name__ == "__main__":
     dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
     dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
 
-    if cuda:
-        print("Using CUDA...")
-    else:
-        print("Using CPU...")
-    sys.stdout.flush()
-
     criterion = CrossEntropyLoss(reduction="sum")
-
     model = RecurrentAutoencoder(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
-    checkpoint = get_checkpoint(model_name)
+    mt = RAETrainer(
+        criterion=criterion,
+        model=model,
+        optimizer=optimizer,
+        batch_size=batch_size,
+        max_epochs=max_epochs,
+        training_data=dataset_train,
+        validation_data=dataset_validation,
+    )
 
-    if checkpoint is not None:
-        print("Continuing from previously trained model")
-        current_epoch = checkpoint["epoch"]
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        training_loss = checkpoint["training_loss"]
-        validation_loss = checkpoint["validation_loss"]
-    else:
-        current_epoch = -1
-        training_loss = []
-        validation_loss = []
-
-    train_loader = get_loader(dataset_train, batch_size, pin_memory=cuda)
-    validation_loader = get_loader(dataset_validation, batch_size, pin_memory=cuda)
-
-    if cuda:
-        model.to(torch.device("cuda"))
-        # Fix for optimizer on cpu
-        for state in optimizer.state.values():
-            for k, v in state.items():
-                if isinstance(v, torch.Tensor):
-                    state[k] = v.cuda()
-
-    # For each epoch
-    for epoch in range(current_epoch + 1, max_epochs):
-
-        # Track loss per batch
-        epoch_training_loss = []
-        epoch_validation_loss = []
-
-        model.eval()
-
-        with torch.no_grad():
-
-            # For each sentence in validation set
-            for x in validation_loader:
-
-                x = get_variable(x)
-
-                output = model(x)
-                
-                # Average loss per tweet 
-                loss = criterion(output.data, x.data) // x.batch_sizes[0]
-
-                # Update loss
-                epoch_validation_loss.append(
-                    (
-                        x.batch_sizes[0].numpy(),
-                        get_numpy(loss.detach()),
-                    )
-                )
-
-        model.train()
-
-        # For each sentence in training set
-        for x in train_loader:
-
-            x = get_variable(x)
-
-            # Forward pass
-            output = model(x)
-            
-            # Average loss per tweet 
-            loss = criterion(output.data, x.data) / x.batch_sizes[0]
-
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            epoch_training_loss.append(
-                (
-                    x.batch_sizes[0].numpy(),
-                    get_numpy(loss.detach()),
-                )
-            )
-
-        # Save loss for plot
-        weigths, batch_average = zip(*epoch_training_loss)
-        training_loss.append(np.average(batch_average, weights=weigths))
-
-        weigths, batch_average = zip(*epoch_validation_loss)
-        validation_loss.append(np.average(batch_average, weights=weigths))
-
-        print(f"Epoch {epoch+1} done!")
-        print(f"T. loss: {training_loss[-1]}")
-        print(f"V. loss: {validation_loss[-1]}")
-        sys.stdout.flush()
-
-        save_checkpoint(
-            model_name=model_name,
-            epoch=epoch,
-            model=model,
-            optimizer=optimizer,
-            training_loss=training_loss,
-            validation_loss=validation_loss,
-        )
+    mt.restore_checkpoint()
+    mt.train(progress_bar=True)

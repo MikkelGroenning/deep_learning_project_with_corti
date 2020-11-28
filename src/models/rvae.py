@@ -7,8 +7,8 @@ import pandas as pd
 import torch
 from src.data.characters import TwitterDatasetChar, alphabet
 from src.data.common import get_loader
-from src.models.common import (EmbeddingPacked, cuda, get_checkpoint,
-                               get_numpy, get_variable, save_checkpoint,
+from src.models.common import (EmbeddingPacked, ModelTrainer, cuda,
+                               get_numpy, get_variable,
                                simple_elementwise_apply)
 from torch import Tensor
 from torch.distributions import Distribution
@@ -226,139 +226,55 @@ class VariationalInference(Module):
 
         return loss, diagnostics, outputs
 
-model_name = "RecurrentVariationalAutoencoder"
+class RVAETrainer(ModelTrainer):
+
+    def __init__(self, vi, *args, **kwargs):
+
+        super(RVAETrainer, self).__init__(*args, **kwargs)
+        self.vi = vi
+
+    def get_loss(self, x):
+
+        loss, _, _ = self.vi(self.model, x)
+
+        return loss
+
 # Default, should probably be explicit
 model_parameters = {}
 
 # Training parameters
-batch_size = 2000
-max_epochs = 605
+batch_size = 200
+max_epochs = 5
 
 optimizer_parameters = {"lr": 0.001}
-
-def get_model():
-
-    try:
-        checkpoint = get_checkpoint(model_name)
-    except FileNotFoundError:
-        print("Model not trained yet")
-        return None
-
-    model = RecurrentVariationalAutoencoder(**model_parameters)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    return model
 
 if __name__ == "__main__":
 
     print("Loading dataset...")
     data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
-    split_idx = int(len(data) * 0.7)
+    # split_idx = int(len(data) * 0.7)
 
-    dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
-    dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
+    # dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
+    # dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
 
-    if cuda:
-        print("Using CUDA...")
-    else:
-        print("Using CPU...")
-    sys.stdout.flush()
+    dataset_train = TwitterDatasetChar(data.iloc[:1000, :].copy())
+    dataset_validation = TwitterDatasetChar(data.iloc[1000:1200, :].copy())
 
     vi = VariationalInference()
-
     model = RecurrentVariationalAutoencoder(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
-    checkpoint = get_checkpoint(model_name)
+    mt = RVAETrainer(
+        vi=vi,
+        model=model,
+        optimizer=optimizer,
+        batch_size=batch_size,
+        max_epochs=max_epochs,
+        training_data=dataset_train,
+        validation_data=dataset_validation,
+    )
 
-    if checkpoint is not None:
-        print("Continuing from previously trained model")
-        current_epoch = checkpoint["epoch"]
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        training_loss = checkpoint["training_loss"]
-        validation_loss = checkpoint["validation_loss"]
-    else:
-        current_epoch = -1
-        training_loss = []
-        validation_loss = []
+    mt.restore_checkpoint()
+    mt.train(progress_bar=True)
 
-    train_loader = get_loader(dataset_train, batch_size, pin_memory=cuda)
-    validation_loader = get_loader(dataset_validation, batch_size, pin_memory=cuda)
-
-    if cuda:
-        model.to(torch.device("cuda"))
-        # Fix for optimizer on cpu
-        for state in optimizer.state.values():
-            for k, v in state.items():
-                if isinstance(v, torch.Tensor):
-                    state[k] = v.cuda()
-
-    # For each epoch
-    for epoch in range(current_epoch + 1, max_epochs):
-
-        # Track loss per batch
-        epoch_training_loss = []
-        epoch_validation_loss = []
-
-        model.eval()
-
-        with torch.no_grad():
-
-            # For each sentence in validation set
-            for x in validation_loader:
-
-                x = get_variable(x)
-
-                # Variational inference
-                loss, diagnostics, outputs = vi(model, x)
-
-                # Update loss
-                epoch_validation_loss.append(
-                    (
-                        x.batch_sizes[0].numpy(),
-                        get_numpy(loss.detach()),
-                    )
-                )
-
-        model.train()
-
-        # For each sentence in training set
-        for x in train_loader:
-
-            x = get_variable(x)
-
-            # Forward pass
-            loss, diagnostics, outputs = vi(model, x)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            epoch_training_loss.append(
-                (
-                    x.batch_sizes[0].numpy(),
-                    get_numpy(loss.detach()),
-                )
-            )
-
-        # Save loss for plot
-        weigths, batch_average = zip(*epoch_training_loss)
-        training_loss.append(np.average(batch_average, weights=weigths))
-
-        weigths, batch_average = zip(*epoch_validation_loss)
-        validation_loss.append(np.average(batch_average, weights=weigths))
-
-        print(f"Epoch {epoch+1} done!")
-        print(f"T. loss: {training_loss[-1]}")
-        print(f"V. loss: {validation_loss[-1]}")
-        sys.stdout.flush()
-
-        save_checkpoint(
-            model_name=model_name,
-            epoch=epoch,
-            model=model,
-            optimizer=optimizer,
-            training_loss=training_loss,
-            validation_loss=validation_loss,
-        )
