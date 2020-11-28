@@ -50,6 +50,7 @@ class Embedder:
         except Exception as e:
             print(e)
             print("Date has not been hydrated")
+            raise
 
         for pattern_string, char in regex_html_tags.items():
             tweets["text_processed"] = tweets["text"].str.replace(pattern_string, char)
@@ -87,9 +88,9 @@ class Embedder:
                         else self.average
                         for word in tweet.split()
                     ],
-                ).T,
+                ),
             )
-            embedding_tweet = embedding_tweet.type(torch.float16)
+            embedding_tweet = embedding_tweet.type(torch.float)
             tweets_embedding.append(embedding_tweet)
 
         torch.save(tweets_embedding, path_embedded)
