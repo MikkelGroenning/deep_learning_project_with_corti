@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 import torch
-from src.data.characters import TwitterDatasetCharacter, alphabet
+from src.data.characters import TwitterDatasetChar, alphabet
 from src.data.common import get_loader
 from src.models.common import (EmbeddingPacked, cuda, get_checkpoint,
                                get_numpy, get_variable, save_checkpoint,
@@ -255,8 +255,8 @@ if __name__ == "__main__":
 
     split_idx = int(len(data) * 0.7)
 
-    dataset_train = TwitterDatasetCharacter(data.iloc[:split_idx, :].copy())
-    dataset_validation = TwitterDatasetCharacter(data.iloc[split_idx:, :].copy())
+    dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
+    dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
 
     if cuda:
         print("Using CUDA...")

@@ -32,7 +32,7 @@ regex_links = re.compile("http\S+")
 regex_whitespace = re.compile("[\s|-]+")
 regex_unknown = re.compile(f"[^{alphabet}]+")
 
-class TwitterDatasetCharacter(torch.utils.data.Dataset):
+class TwitterDatasetChar(torch.utils.data.Dataset):
     
     def __init__(self, tweets):
 
