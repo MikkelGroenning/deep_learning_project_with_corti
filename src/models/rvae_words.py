@@ -236,8 +236,8 @@ class RVAETrainer(ModelTrainer):
 model_parameters = {}
 
 # Training parameters
-batch_size = 200
-max_epochs = 5
+batch_size = 2000
+max_epochs = 500
 
 optimizer_parameters = {"lr": 0.001}
 
@@ -246,13 +246,10 @@ if __name__ == "__main__":
     print("Loading dataset...")
     data = torch.load('data/processed/200316_embedding.pkl')
 
-    # split_idx = int(len(data) * 0.7)
+    split_idx = int(len(data) * 0.7)
 
-    # dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
-    # dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
-
-    dataset_train = TwitterDataWords(data[:1000])
-    dataset_validation = TwitterDataWords(data[1000:1100])
+    dataset_train = TwitterDataWords(data[:split_idx])
+    dataset_validation = TwitterDataWords(data[split_idx:])
 
     vi = VariationalInference()
     model = RVAEWords(**model_parameters)
@@ -269,5 +266,5 @@ if __name__ == "__main__":
     )
 
     mt.restore_checkpoint()
-    mt.train(progress_bar=True)
+    mt.train()
 

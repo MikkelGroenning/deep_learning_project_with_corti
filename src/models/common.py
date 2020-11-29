@@ -99,6 +99,8 @@ class ModelTrainer(ABC):
             self.device = torch.device("cpu")
             print("Training using CPU")
 
+        self.model.to(device)
+        
     @abstractmethod
     def get_loss(self, x):
         """ Get average loss in batch x. x is PackedSequence """

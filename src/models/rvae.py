@@ -243,8 +243,8 @@ class RVAETrainer(ModelTrainer):
 model_parameters = {}
 
 # Training parameters
-batch_size = 200
-max_epochs = 5
+batch_size = 2000
+max_epochs = 500
 
 optimizer_parameters = {"lr": 0.001}
 
@@ -276,5 +276,5 @@ if __name__ == "__main__":
     )
 
     mt.restore_checkpoint()
-    mt.train(progress_bar=True)
+    mt.train()
 
