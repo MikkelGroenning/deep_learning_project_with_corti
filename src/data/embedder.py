@@ -86,7 +86,7 @@ class Embedder:
                         self.embedder[word]
                         if word in self.embedder.vocab.keys()
                         else self.average
-                        for word in tweet.split()
+                        for word in tweet.split() + ['EOS']
                     ],
                 ),
             )
