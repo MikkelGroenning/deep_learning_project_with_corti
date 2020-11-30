@@ -6,7 +6,7 @@ import numpy as np
 import sys
 import pandas as pd
 import torch
-from src.data.characters import TwitterDatasetChar, alphabet
+from src.data.words import TwitterDataWords
 from src.data.common import get_loader
 
 from src.models.common import (
@@ -15,36 +15,30 @@ from src.models.common import (
     cuda,
 )
 
-from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential
+from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential, MSELoss
 from torch.nn.utils.rnn import pack_padded_sequence, pack_sequence, pad_packed_sequence
 from torch.optim import SGD
 from torch.optim import Adam
 
-num_classes = len(alphabet)
+import math
 
+embedding_dimension = 300
 
 class Encoder(Module):
     def __init__(
         self,
-        embedding_dim=10,
         latent_features=64,
         hidden_size=64,
         num_layers=2,
     ):
 
         super(Encoder, self).__init__()
-        self.embedding_dim = embedding_dim
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.latent_features = latent_features
 
-        self.embedding = EmbeddingPacked(
-            num_embeddings=num_classes,
-            embedding_dim=self.embedding_dim,
-        )
-
         self.rnn = LSTM(
-            input_size=self.embedding_dim,
+            input_size=embedding_dimension,
             hidden_size=self.hidden_size,
             num_layers=self.num_layers,
         )
@@ -55,7 +49,6 @@ class Encoder(Module):
 
     def forward(self, x):
 
-        x = self.embedding(x)
         x, (hidden_n, _) = self.rnn(x)
 
         return self.ff(hidden_n[-1])
@@ -73,7 +66,6 @@ class Decoder(Module):
 
         self.latent_features = latent_features
         self.hidden_size = hidden_size
-        self.n_features = len(alphabet)
 
         self.rnn = LSTM(
             input_size=self.latent_features,
@@ -81,7 +73,7 @@ class Decoder(Module):
             num_layers=num_layers,
         )
 
-        self.output_layer = Linear(hidden_size, self.n_features)
+        self.output_layer = Linear(hidden_size, embedding_dimension)
 
     def forward(self, x, batch_sizes):
 
@@ -99,10 +91,10 @@ class Decoder(Module):
         return simple_elementwise_apply(self.output_layer, x)
 
 
-class RecurrentAutoencoder(Module):
+class RecurrentAutoencoderWords(Module):
     def __init__(self, latent_features=64):
 
-        super(RecurrentAutoencoder, self).__init__()
+        super(RecurrentAutoencoderWords, self).__init__()
 
         self.latent_features = latent_features
 
@@ -130,7 +122,7 @@ class RAETrainer(ModelTrainer):
     def get_loss(self, x):
 
         output = self.model(x)
-        loss = self.criterion(output.data, x.data) / x.batch_sizes[0]
+        loss = self.criterion(output.data, x.data) / x.batch_sizes[0] 
 
         return loss
 
@@ -140,22 +132,25 @@ model_parameters = {}
 # Training parameters
 
 batch_size = 2000
-max_epochs = 500
+max_epochs = 30
 
 optimizer_parameters = {"lr": 0.001}
 
 if __name__ == "__main__":
 
     print("Loading dataset...")
-    data = pd.read_pickle("data/interim/hydrated/200316.pkl")
+    data = torch.load('data/processed/200316_embedding.pkl')
 
     split_idx = int(len(data) * 0.7)
 
-    dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
-    dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
+    # dataset_train = TwitterDataWords(data[:split_idx])
+    # dataset_validation = TwitterDataWords(data[split_idx:])
 
-    criterion = CrossEntropyLoss(reduction="sum")
-    model = RecurrentAutoencoder(**model_parameters)
+    dataset_train = TwitterDataWords(data[:1000])
+    dataset_validation = TwitterDataWords(data[1000:1200])
+
+    criterion = MSELoss(reduction='sum')
+    model = RecurrentAutoencoderWords(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
     mt = RAETrainer(

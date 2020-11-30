@@ -78,7 +78,7 @@ class ModelTrainer(ABC):
         # Data loaders
         self.train_loader = get_loader(self.training_data, batch_size)
         self.validation_loader = (
-            get_loader(self.training_data, batch_size)
+            get_loader(self.validation_data, batch_size)
             if self.validation_data is not None
             else None
         )

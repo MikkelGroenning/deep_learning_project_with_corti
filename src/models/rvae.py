@@ -84,8 +84,11 @@ class Encoder(Module):
 
         x = self.embedding(x)
         x, (hidden_n, _) = self.rnn(x)
+        h_x = self.ff(hidden_n[-1])
 
-        return self.ff(hidden_n[-1])
+        mu, log_sigma = h_x.chunk(2, dim=-1)
+
+        return mu, log_sigma
 
 
 class Decoder(Module):
@@ -136,7 +139,9 @@ class RecurrentVariationalAutoencoder(Module):
 
         self.latent_features = latent_features
 
-        self.encoder = Encoder(self.latent_features)
+        self.encoder = Encoder(
+            latent_features=self.latent_features
+            )
         self.decoder = Decoder(
             latent_features=self.latent_features,
             hidden_size=64,
@@ -152,8 +157,7 @@ class RecurrentVariationalAutoencoder(Module):
         """return the distribution `q(z|x) = N(z | \mu(x), \sigma(x))`"""
 
         # compute the parameters of the posterior
-        h_x = self.encoder(x)
-        mu, log_sigma = h_x.chunk(2, dim=-1)
+        mu, log_sigma = self.encoder(x)
 
         # return a distribution `q(z|x) = N(z | \mu(x), \sigma(x))`
         return ReparameterizedDiagonalGaussian(mu, log_sigma)
@@ -226,6 +230,7 @@ class VariationalInference(Module):
 
         return loss, diagnostics, outputs
 
+
 class RVAETrainer(ModelTrainer):
 
     def __init__(self, vi, *args, **kwargs):
@@ -243,8 +248,8 @@ class RVAETrainer(ModelTrainer):
 model_parameters = {}
 
 # Training parameters
-batch_size = 2000
-max_epochs = 500
+batch_size = 500
+max_epochs = 5
 
 optimizer_parameters = {"lr": 0.001}
 
