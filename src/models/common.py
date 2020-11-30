@@ -249,3 +249,87 @@ def get_trained_model(model_class, training_info=False):
         )
     else:
         return model
+
+
+
+def decode_tweet_to_text(decoded_tweet, embedding, joined = False):
+    # Init list for words
+    decoded_tweet_word_list = []
+
+    # Loop over all words
+    for word in decoded_tweet:
+        # Stop when end reached
+        if all(word == 0):
+            break
+
+        # Add decoded word
+        decoded_tweet_word_list.append(embedding.similar_by_vector(np.array(word), topn=1, restrict_vocab=None)[0][0])
+
+    # Return decoded list
+    if joined:
+        return ' '.join(decoded_tweet_word_list)
+    else:
+        return decoded_tweet_word_list
+
+
+def cos_sim(a, b):
+    return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
+
+
+def decode_tweet_to_text(decoded_tweet, embedding, joined = False):
+    # Init list for words
+    decoded_tweet_word_list = []
+
+    # Loop over all words
+    for word in decoded_tweet:
+        # Stop when end reached
+        if all(word == 0):
+            break
+
+        # Add decoded word
+        decoded_tweet_word_list.append(embedding.similar_by_vector(np.array(word), topn=1, restrict_vocab=None)[0][0])
+
+    # Return decoded list
+    if joined:
+        return ' '.join(decoded_tweet_word_list)
+    else:
+        return decoded_tweet_word_list
+
+
+def cos_sim(a, b):
+    return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
+
+
+def actual_decode_similarity(sample, target, embedding):
+    # Calculate average
+    rsum = np.zeros(300)
+ 
+    for word, _ in embedding.vocab.items():
+        rsum += embedding[word]
+    
+    average = rsum/len(embedding.vocab)
+
+    # Init values
+    cos_sim_embed = 0
+    cos_sim_target = 0
+    cos_sim_avg = 0
+    counter = 0
+
+    # Loop over words 
+    for (sample_word, target_word) in zip(sample, target):
+        # Stop when end reached
+        if all(sample_word == 0):
+            break
+
+        # Get debedded word
+        embed_word = embedding.similar_by_vector(np.array(sample_word), topn=1, restrict_vocab=None)[0][0]
+        
+        # Calculate cosine similarities
+        cos_sim_embed += cos_sim(embedding[embed_word], sample_word)
+        cos_sim_target += cos_sim(target_word, sample_word)
+        cos_sim_avg += cos_sim(target_word, average)
+
+        # Increment couter for average
+        counter += 1
+
+    return {embedding: cos_sim_embed/counter, target: cos_sim_target/counter, average: cos_sim_avg/counter}
