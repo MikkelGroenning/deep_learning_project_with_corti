@@ -1,18 +1,12 @@
-import sys
 from itertools import chain
 from typing import Dict, Tuple
 
 import numpy as np
-import pandas as pd
 import torch
 from src.data.words import TwitterDataWords
-from src.data.common import get_loader
-from src.models.common import (EmbeddingPacked, ModelTrainer, cuda,
-                               get_numpy, get_variable,
-                               simple_elementwise_apply)
+from src.models.common import (ModelTrainer, VITrainer, simple_elementwise_apply)
 from torch import Tensor
 from torch.distributions import Distribution
-from torch.distributions.categorical import Categorical
 from torch.nn import LSTM, Linear, Module, Sequential, Dropout, Linear, ReLU
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.optim import Adam
@@ -297,25 +291,13 @@ class VariationalInference(Module):
 
         return loss, diagnostics, outputs
 
-class RVAETrainer(ModelTrainer):
-
-    def __init__(self, vi, *args, **kwargs):
-
-        super(RVAETrainer, self).__init__(*args, **kwargs)
-        self.vi = vi
-
-    def get_loss(self, x):
-
-        loss, _, _ = self.vi(self.model, x)
-
-        return loss
 
 # Default, should probably be explicit
 model_parameters = {}
 
 # Training parameters
-batch_size = 200
-max_epochs = 10
+batch_size = 2000
+max_epochs = 500
 
 optimizer_parameters = {"lr": 0.001}
 
@@ -324,20 +306,19 @@ if __name__ == "__main__":
     print("Loading dataset...")
     data = torch.load('data/processed/200316_embedding.pkl')
 
-    # split_idx = int(len(data) * 0.7)
+    split_idx = int(len(data) * 0.7)
 
-    # dataset_train = TwitterDataWords(data[:split_idx])
-    # dataset_validation = TwitterDataWords(data[split_idx:])
+    dataset_train = TwitterDataWords(data[:split_idx])
+    dataset_validation = TwitterDataWords(data[split_idx:])
 
-    dataset_train = TwitterDataWords(data[:2000])
-    dataset_validation = TwitterDataWords(data[2000:1000])
-
+    # dataset_train = TwitterDataWords(data[:1000])
+    # dataset_validation = TwitterDataWords(data[1000:1500])
 
     vi = VariationalInference()
     model = IAFWords(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
-    mt = RVAETrainer(
+    mt = VITrainer(
         vi=vi,
         model=model,
         optimizer=optimizer,
@@ -349,6 +330,3 @@ if __name__ == "__main__":
 
     mt.restore_checkpoint()
     mt.train()
-
-    print(model)
-

@@ -1,14 +1,11 @@
-import sys
 from itertools import chain
 from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
-from src.data.characters import TwitterDatasetChar, alphabet
-from src.data.common import get_loader
-from src.models.common import (EmbeddingPacked, ModelTrainer, cuda,
-                               get_numpy, get_variable,
+from src.data.characters import TwitterDataChars, alphabet
+from src.models.common import (EmbeddingPacked, ModelTrainer, VITrainer,
                                simple_elementwise_apply)
 from torch import Tensor
 from torch.distributions import Distribution
@@ -131,11 +128,11 @@ class Decoder(Module):
         return simple_elementwise_apply(self.output_layer, x)
 
 
-class RecurrentVariationalAutoencoder(Module):
+class VRAEChars(Module):
 
     def __init__(self, latent_features=64):
 
-        super(RecurrentVariationalAutoencoder, self).__init__()
+        super(VRAEChars, self).__init__()
 
         self.latent_features = latent_features
 
@@ -230,26 +227,12 @@ class VariationalInference(Module):
 
         return loss, diagnostics, outputs
 
-
-class RVAETrainer(ModelTrainer):
-
-    def __init__(self, vi, *args, **kwargs):
-
-        super(RVAETrainer, self).__init__(*args, **kwargs)
-        self.vi = vi
-
-    def get_loss(self, x):
-
-        loss, _, _ = self.vi(self.model, x)
-
-        return loss
-
 # Default, should probably be explicit
 model_parameters = {}
 
 # Training parameters
-batch_size = 500
-max_epochs = 5
+batch_size = 2000
+max_epochs = 500
 
 optimizer_parameters = {"lr": 0.001}
 
@@ -258,19 +241,19 @@ if __name__ == "__main__":
     print("Loading dataset...")
     data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
-    # split_idx = int(len(data) * 0.7)
+    split_idx = int(len(data) * 0.7)
 
-    # dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
-    # dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
+    dataset_train = TwitterDataChars(data.iloc[:split_idx, :].copy())
+    dataset_validation = TwitterDataChars(data.iloc[split_idx:, :].copy())
 
-    dataset_train = TwitterDatasetChar(data.iloc[:1000, :].copy())
-    dataset_validation = TwitterDatasetChar(data.iloc[1000:1200, :].copy())
+    # dataset_train = TwitterDataChars(data.iloc[:1000, :].copy())
+    # dataset_validation = TwitterDataChars(data.iloc[1000:1500, :].copy())
 
     vi = VariationalInference()
-    model = RecurrentVariationalAutoencoder(**model_parameters)
+    model = VRAEChars(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
-    mt = RVAETrainer(
+    mt = VITrainer(
         vi=vi,
         model=model,
         optimizer=optimizer,

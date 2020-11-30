@@ -100,7 +100,7 @@ class ModelTrainer(ABC):
             print("Training using CPU")
 
         self.model.to(device)
-        
+
     @abstractmethod
     def get_loss(self, x):
         """ Get average loss in batch x. x is PackedSequence """
@@ -244,15 +244,14 @@ def get_trained_model(model_class, training_info=False):
             {
                 "training_loss": checkpoint["training_loss"],
                 "validation_loss": checkpoint["validation_loss"],
-                "num_epocs": checkpoint["epoch"]+1,
+                "num_epocs": checkpoint["epoch"] + 1,
             },
         )
     else:
         return model
 
 
-
-def decode_tweet_to_text(decoded_tweet, embedding, joined = False):
+def decode_tweet_to_text(decoded_tweet, embedding, joined=False):
     # Init list for words
     decoded_tweet_word_list = []
 
@@ -263,20 +262,24 @@ def decode_tweet_to_text(decoded_tweet, embedding, joined = False):
             break
 
         # Add decoded word
-        decoded_tweet_word_list.append(embedding.similar_by_vector(np.array(word), topn=1, restrict_vocab=None)[0][0])
+        decoded_tweet_word_list.append(
+            embedding.similar_by_vector(np.array(word), topn=1, restrict_vocab=None)[0][
+                0
+            ]
+        )
 
     # Return decoded list
     if joined:
-        return ' '.join(decoded_tweet_word_list)
+        return " ".join(decoded_tweet_word_list)
     else:
         return decoded_tweet_word_list
 
 
 def cos_sim(a, b):
-    return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-def decode_tweet_to_text(decoded_tweet, embedding, joined = False):
+def decode_tweet_to_text(decoded_tweet, embedding, joined=False):
     # Init list for words
     decoded_tweet_word_list = []
 
@@ -287,27 +290,31 @@ def decode_tweet_to_text(decoded_tweet, embedding, joined = False):
             break
 
         # Add decoded word
-        decoded_tweet_word_list.append(embedding.similar_by_vector(np.array(word), topn=1, restrict_vocab=None)[0][0])
+        decoded_tweet_word_list.append(
+            embedding.similar_by_vector(np.array(word), topn=1, restrict_vocab=None)[0][
+                0
+            ]
+        )
 
     # Return decoded list
     if joined:
-        return ' '.join(decoded_tweet_word_list)
+        return " ".join(decoded_tweet_word_list)
     else:
         return decoded_tweet_word_list
 
 
 def cos_sim(a, b):
-    return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
 def actual_decode_similarity(sample, target, embedding):
     # Calculate average
     rsum = np.zeros(300)
- 
+
     for word, _ in embedding.vocab.items():
         rsum += embedding[word]
-    
-    average = rsum/len(embedding.vocab)
+
+    average = rsum / len(embedding.vocab)
 
     # Init values
     cos_sim_embed = 0
@@ -315,15 +322,17 @@ def actual_decode_similarity(sample, target, embedding):
     cos_sim_avg = 0
     counter = 0
 
-    # Loop over words 
+    # Loop over words
     for (sample_word, target_word) in zip(sample, target):
         # Stop when end reached
         if all(sample_word == 0):
             break
 
         # Get debedded word
-        embed_word = embedding.similar_by_vector(np.array(sample_word), topn=1, restrict_vocab=None)[0][0]
-        
+        embed_word = embedding.similar_by_vector(
+            np.array(sample_word), topn=1, restrict_vocab=None
+        )[0][0]
+
         # Calculate cosine similarities
         cos_sim_embed += cos_sim(embedding[embed_word], sample_word)
         cos_sim_target += cos_sim(target_word, sample_word)
@@ -332,4 +341,35 @@ def actual_decode_similarity(sample, target, embedding):
         # Increment couter for average
         counter += 1
 
-    return {embedding: cos_sim_embed/counter, target: cos_sim_target/counter, average: cos_sim_avg/counter}
+    return {
+        embedding: cos_sim_embed / counter,
+        target: cos_sim_target / counter,
+        average: cos_sim_avg / counter,
+    }
+
+
+class VITrainer(ModelTrainer):
+    def __init__(self, vi, *args, **kwargs):
+
+        super(VITrainer, self).__init__(*args, **kwargs)
+        self.vi = vi
+
+    def get_loss(self, x):
+
+        loss, _, _ = self.vi(self.model, x)
+
+        return loss
+
+
+class CriteronTrainer(ModelTrainer):
+    def __init__(self, criterion, *args, **kwargs):
+
+        super(CriteronTrainer, self).__init__(*args, **kwargs)
+        self.criterion = criterion
+
+    def get_loss(self, x):
+
+        output = self.model(x)
+        loss = self.criterion(output.data, x.data) / x.batch_sizes[0]
+
+        return loss

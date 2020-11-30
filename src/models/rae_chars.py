@@ -1,23 +1,16 @@
 from itertools import chain
-import json
-from datetime import datetime
-from pathlib import Path
+
 import numpy as np
-import sys
 import pandas as pd
-import torch
-from src.data.characters import TwitterDatasetChar, alphabet
-from src.data.common import get_loader
+from src.data.characters import TwitterDataChars, alphabet
 
 from src.models.common import (
-    EmbeddingPacked, ModelTrainer,
+    CriteronTrainer, EmbeddingPacked, ModelTrainer,
     simple_elementwise_apply,
-    cuda,
 )
 
-from torch.nn import LSTM, CrossEntropyLoss, Linear, Module, ReLU, Sequential
-from torch.nn.utils.rnn import pack_padded_sequence, pack_sequence, pad_packed_sequence
-from torch.optim import SGD
+from torch.nn import LSTM, CrossEntropyLoss, Linear, Module
+from torch.nn.utils.rnn import pack_padded_sequence
 from torch.optim import Adam
 
 num_classes = len(alphabet)
@@ -99,10 +92,10 @@ class Decoder(Module):
         return simple_elementwise_apply(self.output_layer, x)
 
 
-class RecurrentAutoencoder(Module):
+class RAEChars(Module):
     def __init__(self, latent_features=64):
 
-        super(RecurrentAutoencoder, self).__init__()
+        super(RAEChars, self).__init__()
 
         self.latent_features = latent_features
 
@@ -119,20 +112,6 @@ class RecurrentAutoencoder(Module):
 
         return x
 
-
-class RAETrainer(ModelTrainer):
-
-    def __init__(self, criterion, *args, **kwargs):
-
-        super(RAETrainer, self).__init__(*args, **kwargs)
-        self.criterion = criterion
-
-    def get_loss(self, x):
-
-        output = self.model(x)
-        loss = self.criterion(output.data, x.data) / x.batch_sizes[0]
-
-        return loss
 
 # Default, should probably be explicit
 model_parameters = {}
@@ -151,14 +130,17 @@ if __name__ == "__main__":
 
     split_idx = int(len(data) * 0.7)
 
-    dataset_train = TwitterDatasetChar(data.iloc[:split_idx, :].copy())
-    dataset_validation = TwitterDatasetChar(data.iloc[split_idx:, :].copy())
+    dataset_train = TwitterDataChars(data.iloc[:split_idx, :].copy())
+    dataset_validation = TwitterDataChars(data.iloc[split_idx:, :].copy())
+
+    # dataset_train = TwitterDataChars(data.iloc[:1000, :].copy())
+    # dataset_validation = TwitterDataChars(data.iloc[1000:1500, :].copy())
 
     criterion = CrossEntropyLoss(reduction="sum")
-    model = RecurrentAutoencoder(**model_parameters)
+    model = RAEChars(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
-    mt = RAETrainer(
+    mt = CriteronTrainer(
         criterion=criterion,
         model=model,
         optimizer=optimizer,

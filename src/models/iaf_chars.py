@@ -5,11 +5,9 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 import torch
-from src.data.characters import TwitterDatasetChar, alphabet
-from src.data.common import get_loader
-from src.models.common import (EmbeddingPacked, ModelTrainer, cuda,
-                               get_numpy, get_variable,
-                               simple_elementwise_apply)
+from src.data.characters import TwitterDataChars, alphabet
+
+from src.models.common import EmbeddingPacked, ModelTrainer, VITrainer, simple_elementwise_apply
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.distributions.categorical import Categorical
@@ -21,6 +19,7 @@ from math import pi, log
 embedding_dimension = 10
 num_classes = len(alphabet)
 h_dim = 8
+
 
 class ReparameterizedDiagonalGaussian(Distribution):
     """
@@ -51,6 +50,7 @@ class ReparameterizedDiagonalGaussian(Distribution):
         """return the log probability: log `p(z)`"""
         return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
 
+
 class AutoRegressiveNN(Module):
     def __init__(self, input_dim, output_dim, layer1_dim, layer2_dim):
         super(AutoRegressiveNN, self).__init__()
@@ -61,32 +61,27 @@ class AutoRegressiveNN(Module):
 
         self.FF = Sequential(
             Linear(
-                in_features = self.input_dim,
-                out_features = self.layer1_dim,
-                bias=False
+                in_features=self.input_dim, out_features=self.layer1_dim, bias=False
             ),
             Dropout(p=0.5),
             ReLU(),
             Linear(
-                in_features = self.layer1_dim,
-                out_features = self.layer2_dim,
-                bias=False
+                in_features=self.layer1_dim, out_features=self.layer2_dim, bias=False
             ),
             Dropout(p=0.5),
             ReLU(),
             Linear(
-                in_features = self.layer2_dim,
-                out_features = self.output_dim,
-                bias=False
-            )
+                in_features=self.layer2_dim, out_features=self.output_dim, bias=False
+            ),
         )
 
     def forward(self, z, h):
 
-        x = torch.cat( [z, h], dim=1 )
+        x = torch.cat([z, h], dim=1)
         x = self.FF(x)
         mu, log_sigma = x.chunk(2, dim=1)
         return mu, log_sigma
+
 
 class Encoder(Module):
     def __init__(
@@ -128,7 +123,7 @@ class Encoder(Module):
 
         mu, log_sigma = h_x[:, :-h_dim].chunk(2, dim=-1)
         h = h_x[:, -h_dim:]
-        
+
         return mu, log_sigma, h
 
 
@@ -172,38 +167,39 @@ class Decoder(Module):
 
         return simple_elementwise_apply(self.output_layer, x)
 
+
 class IAF(Module):
     def __init__(self, T, input_dim, output_dim, layer1_dim, layer2_dim):
-        
+
         super(IAF, self).__init__()
-        self.T = T,
+        self.T = (T,)
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.layer1_dim = layer1_dim
         self.layer2_dim = layer2_dim
-        
+
         self.ar_nn = AutoRegressiveNN(
-            input_dim=self.input_dim, 
+            input_dim=self.input_dim,
             output_dim=self.output_dim,
             layer1_dim=self.layer1_dim,
-            layer2_dim=self.layer2_dim
+            layer2_dim=self.layer2_dim,
         )
-        
+
     def forward(self, mu, log_sigma, h):
         eps = torch.empty_like(mu).normal_()
-        z = log_sigma.exp() * eps + mu 
-        l = -torch.sum(log_sigma + 1/2 * torch.pow(eps,2) + 1/2 * log(2*pi))
+        z = log_sigma.exp() * eps + mu
+        l = -torch.sum(log_sigma + 1 / 2 * torch.pow(eps, 2) + 1 / 2 * log(2 * pi))
         T = 3
         for t in range(T):
             m, s = self.ar_nn(z, h)
             sigma = s.sigmoid()
             z = sigma * z + (1 - sigma) * m
             l = l - sigma.log().sum()
-        
+
         return z, l
 
-class IAFChars(Module):
 
+class IAFChars(Module):
     def __init__(self, latent_features=64):
 
         super(IAFChars, self).__init__()
@@ -213,7 +209,7 @@ class IAFChars(Module):
         self.encoder = Encoder(
             embedding_dim=embedding_dimension,
             latent_features=self.latent_features,
-            )
+        )
         self.decoder = Decoder(
             latent_features=self.latent_features,
             hidden_size=64,
@@ -226,13 +222,12 @@ class IAFChars(Module):
         )
 
         self.iaf = IAF(
-            T = 3,
-            input_dim=self.latent_features+h_dim, 
-            output_dim = 2*self.latent_features,
-            layer1_dim = 200,
-            layer2_dim = 200
+            T=3,
+            input_dim=self.latent_features + h_dim,
+            output_dim=2 * self.latent_features,
+            layer1_dim=200,
+            layer2_dim=200,
         )
-
 
     def posterior(self, x: Tensor) -> Distribution:
         """return the distribution `q(z|x) = N(z | \mu(x), \sigma(x))`"""
@@ -269,7 +264,6 @@ class IAFChars(Module):
         # define the prior p(z)
         pz = self.prior(batch_size=x.batch_sizes[0])
 
-
         # define the observation model p(x|z) = B(x | g(z))
         px = self.observation_model(z, batch_sizes=x.batch_sizes)
 
@@ -292,7 +286,7 @@ class VariationalInference(Module):
         log_px = px.log_prob(x.data).sum() / len(z)
 
         log_pz = pz.log_prob(z).mean()
-        log_qz = lz/len(z)
+        log_qz = lz / len(z)
 
         # compute the ELBO with and without the beta parameter:
         # `L^\beta = E_q [ log p(x|z) - \beta * D_KL(q(z|x) | p(z))`
@@ -310,25 +304,13 @@ class VariationalInference(Module):
 
         return loss, diagnostics, outputs
 
-class RVAETrainer(ModelTrainer):
-
-    def __init__(self, vi, *args, **kwargs):
-
-        super(RVAETrainer, self).__init__(*args, **kwargs)
-        self.vi = vi
-
-    def get_loss(self, x):
-
-        loss, _, _ = self.vi(self.model, x)
-
-        return loss
 
 # Default, should probably be explicit
 model_parameters = {}
 
 # Training parameters
-batch_size = 500
-max_epochs = 10
+batch_size = 2000
+max_epochs = 500
 
 optimizer_parameters = {"lr": 0.001}
 
@@ -337,19 +319,19 @@ if __name__ == "__main__":
     print("Loading dataset...")
     data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
-    # split_idx = int(len(data) * 0.7)
+    split_idx = int(len(data) * 0.7)
 
-    # dataset_train = TwitterDataWords(data[:split_idx])
-    # dataset_validation = TwitterDataWords(data[split_idx:])
+    dataset_train = TwitterDataChars(data.iloc[:split_idx])
+    dataset_validation = TwitterDataChars(data.iloc[split_idx:])
 
-    dataset_train = TwitterDatasetChar(data.iloc[:2000].copy())
-    dataset_validation = TwitterDatasetChar(data.iloc[2000:1000].copy())
+    # dataset_train = TwitterDataChars(data.iloc[:1000].copy())
+    # dataset_validation = TwitterDataChars(data.iloc[1000:1500].copy())
 
     vi = VariationalInference()
     model = IAFChars(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
-    mt = RVAETrainer(
+    mt = VITrainer(
         vi=vi,
         model=model,
         optimizer=optimizer,
@@ -360,7 +342,4 @@ if __name__ == "__main__":
     )
 
     mt.restore_checkpoint()
-    mt.train(progress_bar=True)
-
-    print(model)
-
+    mt.train()

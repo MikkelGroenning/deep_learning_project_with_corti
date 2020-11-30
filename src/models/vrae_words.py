@@ -1,22 +1,17 @@
-import sys
 from itertools import chain
 from typing import Dict, Tuple
 
 import numpy as np
-import pandas as pd
 import torch
 from src.data.words import TwitterDataWords
-from src.data.common import get_loader
-from src.models.common import (EmbeddingPacked, ModelTrainer, cuda,
-                               get_numpy, get_variable,
-                               simple_elementwise_apply)
+from src.models.common import VITrainer, simple_elementwise_apply
 from torch import Tensor
 from torch.distributions import Distribution
-from torch.distributions.categorical import Categorical
 from torch.nn import LSTM, Linear, Module
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.optim import Adam
 
+from src.models.common import ModelTrainer
 embedding_dimension = 300
 
 class ReparameterizedDiagonalGaussian(Distribution):
@@ -123,11 +118,11 @@ class Decoder(Module):
         return simple_elementwise_apply(self.output_layer, x)
 
 
-class RVAEWords(Module):
+class VRAEWords(Module):
 
     def __init__(self, latent_features=64):
 
-        super(RVAEWords, self).__init__()
+        super(VRAEWords, self).__init__()
 
         self.latent_features = latent_features
 
@@ -221,19 +216,6 @@ class VariationalInference(Module):
 
         return loss, diagnostics, outputs
 
-class RVAETrainer(ModelTrainer):
-
-    def __init__(self, vi, *args, **kwargs):
-
-        super(RVAETrainer, self).__init__(*args, **kwargs)
-        self.vi = vi
-
-    def get_loss(self, x):
-
-        loss, _, _ = self.vi(self.model, x)
-
-        return loss
-
 # Default, should probably be explicit
 model_parameters = {}
 
@@ -253,11 +235,14 @@ if __name__ == "__main__":
     dataset_train = TwitterDataWords(data[:split_idx])
     dataset_validation = TwitterDataWords(data[split_idx:])
 
+    # dataset_train = TwitterDataWords(data[:1000])
+    # dataset_validation = TwitterDataWords(data[1000:1500])
+
     vi = VariationalInference()
-    model = RVAEWords(**model_parameters)
+    model = VRAEWords(**model_parameters)
     optimizer = Adam(model.parameters(), **optimizer_parameters)
 
-    mt = RVAETrainer(
+    mt = VITrainer(
         vi=vi,
         model=model,
         optimizer=optimizer,
