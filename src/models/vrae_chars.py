@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 from src.data.characters import TwitterDataChars, alphabet
-from src.models.common import (EmbeddingPacked, ModelTrainer, VITrainer,
+from src.models.common import (Decoder, EmbeddingPacked, Encoder, ModelTrainer, ParamEncoder, VITrainer,
                                simple_elementwise_apply)
 from torch import Tensor
 from torch.distributions import Distribution
@@ -45,105 +45,46 @@ class ReparameterizedDiagonalGaussian(Distribution):
         """return the log probability: log `p(z)`"""
         return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
 
-class Encoder(Module):
-    def __init__(
-        self,
-        embedding_dim=10,
-        latent_features=64,
-        hidden_size=64,
-        num_layers=2,
-    ):
-
-        super(Encoder, self).__init__()
-        self.embedding_dim = embedding_dim
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.latent_features = latent_features
-
-        self.embedding = EmbeddingPacked(
-            num_embeddings=num_classes,
-            embedding_dim=self.embedding_dim,
-        )
-
-        self.rnn = LSTM(
-            input_size=self.embedding_dim,
-            hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
-        )
-
-        # A Gaussian is fully characterised by its mean \mu and variance \sigma**2
-        # Note the 2*latent_features
-        self.ff = Linear(
-            in_features=self.hidden_size, out_features=2 * self.latent_features
-        )
-
-    def forward(self, x):
-
-        x = self.embedding(x)
-        x, (hidden_n, _) = self.rnn(x)
-        h_x = self.ff(hidden_n[-1])
-
-        mu, log_sigma = h_x.chunk(2, dim=-1)
-
-        return mu, log_sigma
-
-
-class Decoder(Module):
-    def __init__(
-        self,
-        latent_features=64,
-        hidden_size=64,
-        num_layers=2,
-    ):
-        super(Decoder, self).__init__()
-
-        self.latent_features = latent_features
-        self.hidden_size = hidden_size
-        self.n_features = len(alphabet)
-
-        self.rnn = LSTM(
-            input_size=self.latent_features,
-            hidden_size=self.latent_features,
-            num_layers=num_layers,
-        )
-
-        self.output_layer = Linear(hidden_size, self.n_features)
-
-    def forward(self, x, batch_sizes):
-
-        # waste some memory, but not much
-        x = x.repeat(len(batch_sizes), 1, 1)
-
-        # And now for the tricky part
-        # (calculating sequence lengths from batch sizes)
-        lengths = -np.diff(np.append(batch_sizes.numpy(), 0))
-        sequence_lengths = list(
-            chain.from_iterable(n * [i + 1] for i, n in enumerate(lengths) if n)
-        )[::-1]
-
-        x = pack_padded_sequence(x, sequence_lengths)
-
-        x, (_, _) = self.rnn(x)
-
-        return simple_elementwise_apply(self.output_layer, x)
-
-
 class VRAEChars(Module):
 
-    def __init__(self, latent_features=64):
+    def __init__(
+        self, 
+        input_dim,
+        embedding_dim,
+        latent_features,
+        encoder_hidden_size,
+        decoder_hidden_size,
+        embedding=None,
+    ):
 
         super(VRAEChars, self).__init__()
 
+        self.input_dim = input_dim
+        self.embedding_dim = embedding_dim
         self.latent_features = latent_features
-
-        self.encoder = Encoder(
-            latent_features=self.latent_features
-            )
-        self.decoder = Decoder(
+        self.encoder_hidden_size = encoder_hidden_size
+        self.decoder_hidden_size = decoder_hidden_size
+        
+        self.encoder = ParamEncoder(
+            input_dim=self.embedding_dim,
+            hidden_size_1=self.encoder_hidden_size,
+            hidden_size_2=self.encoder_hidden_size,
             latent_features=self.latent_features,
-            hidden_size=64,
-            num_layers=2,
         )
+
+        self.decoder = Decoder(
+            output_dim=self.input_dim,
+            latent_features=self.latent_features,
+            hidden_size=self.decoder_hidden_size, 
+        ) 
+
+        if embedding is None:
+            self.embedding = EmbeddingPacked(
+                    num_embeddings=input_dim,
+                    embedding_dim=embedding_dim,
+                )
+        else:
+            self.embedding = embedding
 
         # define the parameters of the prior, chosen as p(z) = N(0, I)
         self.register_buffer(
@@ -177,6 +118,8 @@ class VRAEChars(Module):
         return Categorical(logits=px_logits.data)
 
     def forward(self, x):
+
+        x = self.embedding(x)
 
         # define the posterior q(z|x) / encode x into q(z|x)
         qz = self.posterior(x)

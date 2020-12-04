@@ -1,13 +1,14 @@
 from abc import abstractmethod, ABC
+from itertools import chain
 from pathlib import Path
 import sys
 import numpy as np
-from torch.nn.utils.rnn import PackedSequence
-from torch.nn import Module, Embedding
+from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence
+from torch.nn import Module, Embedding, LSTM, Linear
 import torch.nn.functional as FF
 import torch
 
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from src.data.common import get_loader
 
 cuda = torch.cuda.is_available()
@@ -43,9 +44,11 @@ class OneHotPacked(Module):
         super().__init__()
         self.num_classes = num_classes
 
-    def forward(_, x):
-        return simple_elementwise_apply(FF.one_hot, x)
-
+    def forward(self, x):
+        return PackedSequence(
+            FF.one_hot(x.data, num_classes=self.num_classes).float(), 
+            x.batch_sizes
+            )
 
 class EmbeddingPacked(Module):
     def __init__(self, **kwargs):
@@ -99,6 +102,8 @@ class ModelTrainer(ABC):
             self.device = torch.device("cpu")
             print("Training using CPU")
 
+        sys.stdout.flush()
+
         self.model.to(device)
 
     @abstractmethod
@@ -115,7 +120,12 @@ class ModelTrainer(ABC):
         optimizer = self.optimizer
 
         # For each epoch
-        for epoch in range(self.current_epoch + 1, self.max_epochs):
+        if progress_bar == 'epoch':
+            epoch_iter = trange(self.current_epoch + 1, self.max_epochs)
+        else:
+            epoch_iter = range(self.current_epoch + 1, self.max_epochs)
+
+        for epoch in epoch_iter:
 
             # Track loss per batch
             epoch_training_loss = []
@@ -141,7 +151,7 @@ class ModelTrainer(ABC):
 
             model.train()
 
-            if progress_bar:
+            if progress_bar == 'batch':
                 train_loader = tqdm(self.train_loader)
 
             # For each sentence in training set
@@ -172,10 +182,16 @@ class ModelTrainer(ABC):
 
             self.current_epoch = epoch
 
-            print(f"Epoch {epoch+1} done!")
-            print(f"T. loss: {self.training_loss[-1]}")
-            print(f"V. loss: {self.validation_loss[-1]}")
-            sys.stdout.flush()
+            if progress_bar != 'epoch':
+                print(f"Epoch {epoch+1} done!")
+                print(f"T. loss: {self.training_loss[-1]}")
+                print(f"V. loss: {self.validation_loss[-1]}")
+                sys.stdout.flush()
+            elif progress_bar == 'epoch':
+                epoch_iter.set_postfix({
+                    "t_loss" : self.training_loss[-1],
+                    "v_loss" : self.validation_loss[-1],
+                })
 
             self.save_checkpoint()
 
@@ -361,10 +377,10 @@ class VITrainer(ModelTrainer):
         return loss
 
 
-class CriteronTrainer(ModelTrainer):
+class CriterionTrainer(ModelTrainer):
     def __init__(self, criterion, *args, **kwargs):
 
-        super(CriteronTrainer, self).__init__(*args, **kwargs)
+        super(CriterionTrainer, self).__init__(*args, **kwargs)
         self.criterion = criterion
 
     def get_loss(self, x):
@@ -373,3 +389,106 @@ class CriteronTrainer(ModelTrainer):
         loss = self.criterion(output.data, x.data) / x.batch_sizes[0]
 
         return loss
+
+# Encoder defition
+class Encoder(Module):
+    def __init__(
+        self,
+        input_dim,
+        hidden_size,
+        latent_features,
+    ):
+
+        super(Encoder, self).__init__()
+
+        self.input_dim = input_dim
+        self.hidden_size = hidden_size
+        self.latent_features = latent_features
+
+        self.rnn1 = LSTM(
+            input_size=self.input_dim,
+            hidden_size=self.hidden_size
+        )
+
+        self.rnn2 = LSTM(
+            input_size=self.hidden_size,
+            hidden_size=self.latent_features
+        )
+
+    def forward(self, x):
+
+        x, (hidden_n, _) = self.rnn1(x)
+        x, (hidden_n, _) = self.rnn2(x)
+
+        return hidden_n[-1]
+
+
+# Decoder defitinion
+class Decoder(Module):
+    def __init__(
+        self,
+        latent_features,
+        hidden_size,
+        output_dim,
+    ):
+        super(Decoder, self).__init__()
+
+        self.latent_features = latent_features
+        self.hidden_size = hidden_size
+        self.output_dim = output_dim
+
+        self.rnn1 = LSTM(
+            input_size=self.latent_features,
+            hidden_size=self.latent_features,
+        )
+
+        self.rnn2 = LSTM(
+            input_size=self.latent_features,
+            hidden_size=self.hidden_size,
+        )
+
+        self.output_layer = Linear(hidden_size, self.output_dim )
+
+    def forward(self, x, batch_sizes):
+
+        x = x.repeat(len(batch_sizes), 1, 1)
+
+        lengths = -np.diff(np.append(batch_sizes.numpy(), 0))
+        sequence_lengths = list(
+            chain.from_iterable(n * [i + 1] for i, n in enumerate(lengths) if n)
+        )[::-1]
+
+        x = pack_padded_sequence(x, sequence_lengths)
+
+        x, (_, _) = self.rnn1(x)
+        x, (_, _) = self.rnn2(x)
+
+        return simple_elementwise_apply(self.output_layer, x)
+
+
+class ParamEncoder(Encoder):
+
+    def __init__(
+        self,
+        input_dim,
+        hidden_size_1,
+        hidden_size_2,
+        latent_features,
+    ):
+        super(ParamEncoder, self).__init__(
+            input_dim=input_dim,
+            hidden_size=hidden_size_1,
+            latent_features=hidden_size_2,
+            )
+
+        self.linear = Linear(
+            in_features=hidden_size_2, 
+            out_features=2*latent_features
+        )
+
+    def forward(self, x):
+        
+        x = super(ParamEncoder, self).forward(x)
+        x = self.linear(x)
+        mu, log_sigma = x.chunk(2, dim=-1)
+        return mu, log_sigma
