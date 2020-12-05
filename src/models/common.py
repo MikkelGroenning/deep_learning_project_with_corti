@@ -93,6 +93,12 @@ class ModelTrainer(ABC):
         self.training_loss = []
         self.validation_loss = []
 
+        self.best_model = {
+            'validation_loss' : float('inf'),
+            'state_dict' : None,
+        }
+
+
         # Saving model name
         self.model_name = model.__class__.__name__
 
@@ -182,6 +188,10 @@ class ModelTrainer(ABC):
             weigths, batch_average = zip(*epoch_validation_loss)
             self.validation_loss.append(np.average(batch_average, weights=weigths))
 
+            if self.validation_loss[-1] < self.best_model['validation_loss']:
+                self.best_model['validation_loss'] = self.validation_loss[-1]
+                self.best_model['state_dict'] = self.model.state_dict()
+
             self.current_epoch = epoch
 
             if progress_bar != 'epoch':
@@ -208,6 +218,7 @@ class ModelTrainer(ABC):
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "training_loss": self.training_loss,
                 "validation_loss": self.validation_loss,
+                "best_model": self.best_model,
             },
             loc / "checkpoint.pt",
         )
@@ -228,6 +239,8 @@ class ModelTrainer(ABC):
 
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+        self.best_model = checkpoint["best_model"]
 
         if self.cuda:
             self.model.to(self.device)
@@ -250,11 +263,14 @@ def _get_checkpoint(model_name, device):
         return None
 
 
-def get_trained_model(model_class, training_info=False):
+def get_trained_model(model_class, training_info=False, model_name=None):
 
-    checkpoint = _get_checkpoint(model_class.__name__, device)
+    if model_name is None:
+        model_name = model_class.__name__
+
+    checkpoint = _get_checkpoint(model_name, device)
     model = model_class()
-    model.load_state_dict(checkpoint["model_state_dict"])
+    model.load_state_dict(checkpoint["best_model"]["state_dict"])
 
     if training_info:
         return (
@@ -262,6 +278,7 @@ def get_trained_model(model_class, training_info=False):
             {
                 "training_loss": checkpoint["training_loss"],
                 "validation_loss": checkpoint["validation_loss"],
+                "best_validation_loss": checkpoint["best_model"]["validation_loss"],
                 "num_epocs": checkpoint["epoch"] + 1,
             },
         )
