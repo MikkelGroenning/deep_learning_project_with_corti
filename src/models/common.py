@@ -1,15 +1,17 @@
-from abc import abstractmethod, ABC
+import sys
+from abc import ABC, abstractmethod
 from itertools import chain
 from pathlib import Path
-import sys
-import numpy as np
-from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence
-from torch.nn import Module, Embedding, LSTM, Linear
-import torch.nn.functional as FF
-import torch
 
-from tqdm import tqdm, trange
+import numpy as np
+import torch
+import torch.nn.functional as FF
 from src.data.common import get_loader
+from torch.distributions import Distribution
+from torch.nn import LSTM, Embedding, Linear, Module
+from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence
+from torch.tensor import Tensor
+from tqdm import tqdm, trange
 
 cuda = torch.cuda.is_available()
 if cuda:
@@ -492,3 +494,33 @@ class ParamEncoder(Encoder):
         x = self.linear(x)
         mu, log_sigma = x.chunk(2, dim=-1)
         return mu, log_sigma
+
+
+class ReparameterizedDiagonalGaussian(Distribution):
+    """
+    A distribution `N(y | mu, sigma I)` compatible with the reparameterization trick given `epsilon ~ N(0, 1)`.
+    """
+
+    def __init__(self, mu: Tensor, log_sigma: Tensor):
+        assert (
+            mu.shape == log_sigma.shape
+        ), f"Tensors `mu` : {mu.shape} and ` log_sigma` : {log_sigma.shape} must be of the same shape"
+        self.mu = mu
+        self.sigma = log_sigma.exp()
+
+    def sample_epsilon(self) -> Tensor:
+        """`\eps ~ N(0, I)`"""
+        return torch.empty_like(self.mu).normal_()
+
+    def sample(self) -> Tensor:
+        """sample `z ~ N(z | mu, sigma)` (without gradients)"""
+        with torch.no_grad():
+            return self.rsample()
+
+    def rsample(self) -> Tensor:
+        """sample `z ~ N(z | mu, sigma)` (with the reparameterization trick) """
+        return self.mu + self.sigma * self.sample_epsilon()
+
+    def log_prob(self, z: Tensor) -> Tensor:
+        """return the log probability: log `p(z)`"""
+        return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
