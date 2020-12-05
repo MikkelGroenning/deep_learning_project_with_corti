@@ -1,3 +1,6 @@
 [submodule "5f9fda5fc6a0450001724029"]
 	path = overleaf
 	url = https://git.overleaf.com/5f9fda5fc6a0450001724029
+[submodule "vi-torch"]
+	path = vi-torch
+	url = https://github.com/ritchie46/vi-torch.git
