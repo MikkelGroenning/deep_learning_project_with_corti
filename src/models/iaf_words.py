@@ -4,8 +4,18 @@ from typing import Dict, Tuple
 import numpy as np
 import torch
 from src.data.words import TwitterDataWords
-from src.models.common import (ModelTrainer, VITrainer, simple_elementwise_apply)
+from src.models.common import (
+    Decoder,
+    Encoder,
+    ModelTrainer,
+    ParamEncoder,
+    ReparameterizedDiagonalGaussian,
+    VITrainer,
+    simple_elementwise_apply,
+)
 from torch import Tensor
+from src.models.made import AutoRegressiveNN
+
 from torch.distributions import Distribution
 from torch.nn import LSTM, Linear, Module, Sequential, Dropout, Linear, ReLU
 from torch.nn.utils.rnn import pack_padded_sequence
@@ -13,191 +23,119 @@ from torch.optim import Adam
 from math import pi, log
 
 embedding_dimension = 300
-h_dim = 8
 
-class ReparameterizedDiagonalGaussian(Distribution):
-    """
-    A distribution `N(y | mu, sigma I)` compatible with the reparameterization trick given `epsilon ~ N(0, 1)`.
-    """
 
-    def __init__(self, mu: Tensor, log_sigma: Tensor):
-        assert (
-            mu.shape == log_sigma.shape
-        ), f"Tensors `mu` : {mu.shape} and ` log_sigma` : {log_sigma.shape} must be of the same shape"
-        self.mu = mu
-        self.sigma = log_sigma.exp()
+class IAFStep(Module):
+    def __init__(
+        self,
+        in_features,
+        hidden_features,
+        context_features,
+    ):
 
-    def sample_epsilon(self) -> Tensor:
-        """`\eps ~ N(0, I)`"""
-        return torch.empty_like(self.mu).normal_()
+        super(IAFStep, self).__init__()
 
-    def sample(self) -> Tensor:
-        """sample `z ~ N(z | mu, sigma)` (without gradients)"""
-        with torch.no_grad():
-            return self.rsample()
+        self.m_nn = AutoRegressiveNN(
+            in_features=in_features,
+            hidden_features=hidden_features,
+            context_features=context_features,
+        )
 
-    def rsample(self) -> Tensor:
-        """sample `z ~ N(z | mu, sigma)` (with the reparameterization trick) """
-        return self.mu + self.sigma * self.sample_epsilon()
-
-    def log_prob(self, z: Tensor) -> Tensor:
-        """return the log probability: log `p(z)`"""
-        return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
-
-class AutoRegressiveNN(Module):
-    def __init__(self, input_dim, output_dim, layer1_dim, layer2_dim):
-        super(AutoRegressiveNN, self).__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.layer1_dim = layer1_dim
-        self.layer2_dim = layer2_dim
-
-        self.FF = Sequential(
-            Linear(
-                in_features = self.input_dim,
-                out_features = self.layer1_dim,
-                bias=False
-            ),
-            Dropout(p=0.5),
-            ReLU(),
-            Linear(
-                in_features = self.layer1_dim,
-                out_features = self.layer2_dim,
-                bias=False
-            ),
-            Dropout(p=0.5),
-            ReLU(),
-            Linear(
-                in_features = self.layer2_dim,
-                out_features = self.output_dim,
-                bias=False
-            )
+        self.s_nn = AutoRegressiveNN(
+            in_features=in_features,
+            hidden_features=hidden_features,
+            context_features=context_features,
         )
 
     def forward(self, z, h):
 
-        x = torch.cat( [z, h], dim=1 )
-        x = self.FF(x)
-        mu, log_sigma = x.chunk(2, dim=1)
-        return mu, log_sigma
+        m = self.m_nn(z, h)
+        s = self.s_nn(z, h) + 1.5
+        sigma = s.sigmoid()
 
-class Encoder(Module):
+        z = sigma * z + (1 - sigma) * m
+        l = -torch.log(sigma + 1e-6).sum()
+
+        return z, l
+
+
+class IAF(Sequential):
+    def forward(self, mu, log_sigma, h):
+
+        eps = torch.empty_like(mu).normal_()
+        z = log_sigma.exp() * eps + mu
+        l = -torch.sum(log_sigma + 1 / 2 * torch.pow(eps, 2) + 1 / 2 * log(2 * pi))
+
+        for module in self:
+            z, log_lik = module(z, h)
+            l += log_lik
+
+        return z, l
+
+
+class Encoder_(Encoder):
     def __init__(
         self,
-        latent_features=64,
-        hidden_size=64,
-        num_layers=2,
+        input_dim,
+        hidden_size_1,
+        hidden_size_2,
+        latent_features,
+        context_features,
     ):
-
-        super(Encoder, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.latent_features = latent_features
-
-
-        self.rnn = LSTM(
-            input_size=embedding_dimension,
-            hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
+        super(Encoder_, self).__init__(
+            input_dim=input_dim,
+            hidden_size=hidden_size_1,
+            latent_features=hidden_size_2,
         )
 
-        # A Gaussian is fully characterised by its mean \mu and variance \sigma**2
-        # Note the 2*latent_features
-        self.ff = Linear(
-            in_features=self.hidden_size, out_features=2 * self.latent_features + h_dim
+        self.context_features = context_features
+        self.linear = Linear(
+            in_features=hidden_size_2,
+            out_features=2 * latent_features + context_features,
         )
 
     def forward(self, x):
 
-        x, (hidden_n, _) = self.rnn(x)
+        x = super(Encoder_, self).forward(x)
+        x = self.linear(x)
 
-        h_x = self.ff(hidden_n[-1])
-        mu, log_sigma = h_x[:, :-h_dim].chunk(2, dim=-1)
-        h = h_x[:, -h_dim:]
+        h = x[:, -self.context_features :]
+        mu, log_sigma = x[:, : -self.context_features].chunk(2, dim=-1)
+
         return mu, log_sigma, h
 
 
-class Decoder(Module):
+class IAFWords(Module):
     def __init__(
         self,
-        latent_features=64,
-        hidden_size=64,
-        num_layers=2,
+        input_dim,
+        latent_features,
+        encoder_hidden_size,
+        decoder_hidden_size,
+        flow_depth,
+        flow_hidden_features,
+        flow_context_features,
     ):
-        super(Decoder, self).__init__()
-
-        self.latent_features = latent_features
-        self.hidden_size = hidden_size
-
-        self.rnn = LSTM(
-            input_size=self.latent_features,
-            hidden_size=self.latent_features,
-            num_layers=num_layers,
-        )
-
-        self.output_layer = Linear(hidden_size, 2*embedding_dimension)
-
-    def forward(self, x, batch_sizes):
-
-        # waste some memory, but not much
-        x = x.repeat(len(batch_sizes), 1, 1)
-
-        # And now for the tricky part
-        # (calculating sequence lengths from batch sizes)
-        lengths = -np.diff(np.append(batch_sizes.numpy(), 0))
-        sequence_lengths = list(
-            chain.from_iterable(n * [i + 1] for i, n in enumerate(lengths) if n)
-        )[::-1]
-
-        x = pack_padded_sequence(x, sequence_lengths)
-
-        x, (_, _) = self.rnn(x)
-
-        return simple_elementwise_apply(self.output_layer, x)
-
-class IAF(Module):
-    def __init__(self, T, input_dim, output_dim, layer1_dim, layer2_dim):
-        
-        super(IAF, self).__init__()
-        self.T = T,
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.layer1_dim = layer1_dim
-        self.layer2_dim = layer2_dim
-        
-        self.ar_nn = AutoRegressiveNN(
-            input_dim=self.input_dim, 
-            output_dim=self.output_dim,
-            layer1_dim=self.layer1_dim,
-            layer2_dim=self.layer2_dim
-        )
-        
-    def forward(self, mu, log_sigma, h):
-        eps = torch.empty_like(mu).normal_()
-        z = log_sigma.exp() * eps + mu 
-        l = -torch.sum(log_sigma + 1/2 * torch.pow(eps,2) + 1/2 * log(2*pi))
-        T = 3
-        for t in range(T):
-            m, s = self.ar_nn(z, h)
-            sigma = s.sigmoid()
-            z = sigma * z + (1 - sigma) * m
-            l = l - sigma.log().sum()
-        
-        return z, l
-
-class IAFWords(Module):
-
-    def __init__(self, latent_features=64):
 
         super(IAFWords, self).__init__()
 
+        self.input_dim = input_dim
         self.latent_features = latent_features
+        self.encoder_hidden_size = encoder_hidden_size
+        self.decoder_hidden_size = decoder_hidden_size
 
-        self.encoder = Encoder(self.latent_features)
+        self.encoder = Encoder_(
+            input_dim=self.input_dim,
+            hidden_size_1=self.encoder_hidden_size,
+            hidden_size_2=self.encoder_hidden_size,
+            latent_features=self.latent_features,
+            context_features=flow_context_features,
+        )
+
         self.decoder = Decoder(
             latent_features=self.latent_features,
-            hidden_size=64,
-            num_layers=2,
+            hidden_size=self.decoder_hidden_size,
+            output_dim=2 * self.input_dim,
         )
 
         # define the parameters of the prior, chosen as p(z) = N(0, I)
@@ -205,14 +143,15 @@ class IAFWords(Module):
             "prior_params", torch.zeros(torch.Size([1, 2 * latent_features]))
         )
 
+        # Define IAF for posterior
         self.iaf = IAF(
-            T = 3,
-            input_dim=self.latent_features+h_dim, 
-            output_dim = 2*self.latent_features,
-            layer1_dim = 200,
-            layer2_dim = 200
+            *[
+                IAFStep(
+                    self.latent_features, flow_hidden_features, flow_context_features
+                )
+                for _ in range(flow_depth)
+            ]
         )
-
 
     def posterior(self, x: Tensor) -> Distribution:
         """return the distribution `q(z|x) = N(z | \mu(x), \sigma(x))`"""
@@ -237,7 +176,7 @@ class IAFWords(Module):
     def observation_model(self, z: Tensor, batch_sizes: Tensor) -> Distribution:
         """return the distribution `p(x|z)`"""
 
-        h_z = self.decoder(z, batch_sizes) 
+        h_z = self.decoder(z, batch_sizes)
         mu, log_sigma = h_z.data.chunk(2, dim=-1)
 
         return ReparameterizedDiagonalGaussian(mu, log_sigma)
@@ -250,11 +189,10 @@ class IAFWords(Module):
         # define the prior p(z)
         pz = self.prior(batch_size=x.batch_sizes[0])
 
-
         # define the observation model p(x|z) = B(x | g(z))
         px = self.observation_model(z, batch_sizes=x.batch_sizes)
 
-        return {"px": px, "pz": pz, "lz": lz, "z": z}
+        return {"px": px, "pz": pz,  "z": z, "lz": lz}
 
 
 class VariationalInference(Module):
@@ -268,12 +206,12 @@ class VariationalInference(Module):
         outputs = model(x)
 
         # unpack outputs
-        px, pz, lz, z = [outputs[k] for k in ["px", "pz", "lz", "z"]]
+        px, pz, z, lz = [outputs[k] for k in ["px", "pz", "z", "lz"]]
 
         log_px = px.log_prob(x.data).sum() / len(z)
-
         log_pz = pz.log_prob(z).mean()
-        log_qz = lz/len(z)
+
+        log_qz = lz / len(z)
 
         # compute the ELBO with and without the beta parameter:
         # `L^\beta = E_q [ log p(x|z) - \beta * D_KL(q(z|x) | p(z))`
@@ -304,7 +242,7 @@ optimizer_parameters = {"lr": 0.001}
 if __name__ == "__main__":
 
     print("Loading dataset...")
-    data = torch.load('data/processed/200316_embedding.pkl')
+    data = torch.load("data/processed/200316_embedding.pkl")
 
     split_idx = int(len(data) * 0.7)
 

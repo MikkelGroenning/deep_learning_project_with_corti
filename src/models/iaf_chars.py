@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 from src.data.characters import TwitterDataChars, alphabet
 
-from src.models.common import EmbeddingPacked, ModelTrainer, VITrainer, simple_elementwise_apply
+from src.models.common import EmbeddingPacked, ModelTrainer, ReparameterizedDiagonalGaussian, VITrainer, simple_elementwise_apply
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.distributions.categorical import Categorical
@@ -19,37 +19,6 @@ from math import pi, log
 embedding_dimension = 10
 num_classes = len(alphabet)
 h_dim = 8
-
-
-class ReparameterizedDiagonalGaussian(Distribution):
-    """
-    A distribution `N(y | mu, sigma I)` compatible with the reparameterization trick given `epsilon ~ N(0, 1)`.
-    """
-
-    def __init__(self, mu: Tensor, log_sigma: Tensor):
-        assert (
-            mu.shape == log_sigma.shape
-        ), f"Tensors `mu` : {mu.shape} and ` log_sigma` : {log_sigma.shape} must be of the same shape"
-        self.mu = mu
-        self.sigma = log_sigma.exp()
-
-    def sample_epsilon(self) -> Tensor:
-        """`\eps ~ N(0, I)`"""
-        return torch.empty_like(self.mu).normal_()
-
-    def sample(self) -> Tensor:
-        """sample `z ~ N(z | mu, sigma)` (without gradients)"""
-        with torch.no_grad():
-            return self.rsample()
-
-    def rsample(self) -> Tensor:
-        """sample `z ~ N(z | mu, sigma)` (with the reparameterization trick) """
-        return self.mu + self.sigma * self.sample_epsilon()
-
-    def log_prob(self, z: Tensor) -> Tensor:
-        """return the log probability: log `p(z)`"""
-        return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
-
 
 class AutoRegressiveNN(Module):
     def __init__(self, input_dim, output_dim, layer1_dim, layer2_dim):
