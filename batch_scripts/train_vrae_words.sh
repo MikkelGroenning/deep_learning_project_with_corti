@@ -1,7 +1,7 @@
  #!/bin/sh
  #BSUB -q gpuv100
  #BSUB -gpu "num=1"
- #BSUB -J train_rvae_words
+ #BSUB -J train_vrae_words
  #BSUB -n 1
  #BSUB -W 5:00
  #BSUB -B
@@ -11,4 +11,4 @@
  #BSUB -e logs/%J.err
  
  echo "Running script..."
- python3 src/models/rvae_words.py
+ python3 src/models/vrae_words.py
