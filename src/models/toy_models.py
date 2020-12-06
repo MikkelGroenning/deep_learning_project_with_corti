@@ -1,30 +1,24 @@
 import random
-import torch
+
 import numpy as np
-
-from src.models.rae_words import RAEWords as RAE
-from src.models.vrae_words import VRAEWords as VRAE
-from src.models.iaf_words import IAFWords as IAF
-
-from torch.nn import MSELoss
-from src.models.vrae_words import VariationalInference as VI
-from src.models.iaf_words import VariationalInference as VI_IAF
-
-
-from src.data.common import get_loader
-from src.models.common import CriterionTrainer, OneHotPacked, VITrainer
+import torch
 from src.data.toy import Continuous
-
+from src.models.common import CriterionTrainer, VITrainer, VariationalInference
+from src.models.iaf import VRAEIAF
+from src.models.rae import RAE
+from src.models.vrae import VRAE
+from torch.nn import MSELoss
 from torch.optim import Adam
 
-seed = 42
+seed = 43
+
 torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 data_parameters = {
-    "max_length" : 16,
-    "min_length" : 2,
-    "error_scale" : 0.05,
+    "max_length": 16,
+    "min_length": 2,
+    "error_scale": 0.05,
 }
 
 
@@ -52,7 +46,7 @@ vrae = VRAE(
 )
 
 # Variational Recurrent Autoencoder using IAF
-iaf = IAF(
+iaf = VRAEIAF(
     input_dim=1,
     latent_features=2,
     encoder_hidden_size=48,
@@ -87,9 +81,9 @@ if __name__ == "__main__":
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VI()
+    vi = VariationalInference()
     optimizer = Adam(vrae.parameters(), **optimizer_parameters)
-    mt = VITrainer( 
+    mt = VITrainer(
         vi=vi,
         model=vrae,
         optimizer=optimizer,
@@ -106,9 +100,9 @@ if __name__ == "__main__":
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VI_IAF()
+    vi = VariationalInference()
     optimizer = Adam(iaf.parameters(), **optimizer_parameters)
-    mt = VITrainer( 
+    mt = VITrainer(
         vi=vi,
         model=iaf,
         optimizer=optimizer,
@@ -117,15 +111,6 @@ if __name__ == "__main__":
         training_data=train_data,
         validation_data=test_data,
     )
-    mt.model_name = "ToyIAF"
+    mt.model_name = "ToyVRAEIAF"
     mt.restore_checkpoint()
     mt.train()
-
-
-
-
-
-
-
-
-
