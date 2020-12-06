@@ -34,20 +34,41 @@ data_parameters = {
 
 train_data = Continuous(num_observations=10_000, **data_parameters)
 validation_data = Continuous(num_observations=2000, **data_parameters)
-test_data = Continuous(num_observations=2000, **data_parameters)
+test_data = Continuous(num_observations=1000, **data_parameters)
 
 batch_size = 100
 max_epochs = 5
 
+# Recurrent Autoencoder
+rae = RAE(
+    input_dim=1,
+    latent_features=2,
+    encoder_hidden_size=48,
+    decoder_hidden_size=48,
+)
+
+# Variational Recurrent Autoencoder
+vrae = VRAE(
+    input_dim=1,
+    latent_features=2,
+    encoder_hidden_size=48,
+    decoder_hidden_size=48,
+)
+
+# Variational Recurrent Autoencoder using IAF
+iaf = IAF(
+    input_dim=1,
+    latent_features=2,
+    encoder_hidden_size=48,
+    decoder_hidden_size=48,
+    flow_depth=3,
+    flow_hidden_features=48,
+    flow_context_features=4,
+)
+
 if __name__ == "__main__":
 
     # Recurrent Autoencoder
-    rae = RAE(
-        input_dim=1,
-        latent_features=2,
-        encoder_hidden_size=48,
-        decoder_hidden_size=48,
-    )
     optimizer_parameters = {
         "lr": 0.001,
     }
@@ -67,12 +88,6 @@ if __name__ == "__main__":
     mt.train()
 
     # Variational Recurrent Autoencoder
-    vrae = VRAE(
-        input_dim=1,
-        latent_features=2,
-        encoder_hidden_size=48,
-        decoder_hidden_size=48,
-    )
     optimizer_parameters = {
         "lr": 0.001,
     }
@@ -92,15 +107,6 @@ if __name__ == "__main__":
     mt.train()
 
     # Variational Recurrent Autoencoder using IAF
-    iaf = IAF(
-        input_dim=1,
-        latent_features=2,
-        encoder_hidden_size=48,
-        decoder_hidden_size=48,
-        flow_depth=4,
-        flow_hidden_features=24,
-        flow_context_features=4,
-    )
     optimizer_parameters = {
         "lr": 0.001,
     }

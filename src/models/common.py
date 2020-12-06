@@ -263,13 +263,12 @@ def _get_checkpoint(model_name, device):
         return None
 
 
-def get_trained_model(model_class, training_info=False, model_name=None):
+def get_trained_model(model, training_info=False, model_name=None):
 
     if model_name is None:
-        model_name = model_class.__name__
+        model_name = model.__class__.__name__
 
     checkpoint = _get_checkpoint(model_name, device)
-    model = model_class()
     model.load_state_dict(checkpoint["best_model"]["state_dict"])
 
     if training_info:

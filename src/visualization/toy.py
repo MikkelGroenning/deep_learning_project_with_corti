@@ -1,0 +1,204 @@
+# %%
+
+from pathlib import Path
+import torch
+from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence, pack_padded_sequence
+import random
+
+from src.models.example_models import rae, vrae, iaf, test_data
+from src.models.common import get_trained_model, get_loader
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+figure_directory = Path(__file__).parent.parent.parent / 'reports' / 'figures'
+
+sns.set_style("whitegrid")
+
+random.seed(44)
+
+n_test = 1000
+x_test = next(iter(get_loader(test_data, n_test)))
+target_padded, sequence_lengths = pad_packed_sequence(x_test)
+target_averages = []
+for i, length in enumerate(sequence_lengths):
+    arr = target_padded[:,i][:length-1].numpy()
+    target_averages.append(arr.mean())
+    
+batch_sizes = x_test.batch_sizes
+
+num_emph = 4
+emph_index = sorted(random.choices(range(len(test_data)), k=num_emph))
+emph_packed = pack_padded_sequence( target_padded[:,emph_index,:], sequence_lengths[emph_index])
+
+
+rae, t_info_rae = get_trained_model(rae, model_name="ToyRAE", training_info=True)
+vrae, t_info_vrae = get_trained_model(vrae, model_name="ToyVRAE", training_info=True)
+iaf, t_info_iaf = get_trained_model(iaf, model_name="ToyIAF", training_info=True)
+
+# %% Recurrent Autoencoder
+plt.figure()
+plt.plot(t_info_rae["training_loss"])
+plt.plot(t_info_rae["validation_loss"])
+plt.savefig(figure_directory / "rae_toy_loss.pdf")
+
+#%%
+output_rae = rae(x_test)
+latent_rae = rae.encoder(x_test)
+
+#%%
+plt.figure()
+sns.scatterplot(
+    x=latent_rae[:,0].detach().numpy(),
+    y=latent_rae[:,1].detach().numpy(),
+    size=sequence_lengths.numpy(),
+    hue=target_averages,
+    )
+plt.savefig(figure_directory / "rae_toy_latent.pdf")
+
+# %%
+plt.figure()
+sns.scatterplot(
+    x=latent_rae[:,0].detach().numpy(),
+    y=latent_rae[:,1].detach().numpy(),
+    size=sequence_lengths.numpy(),
+    hue=target_averages,
+    alpha=0.2,
+    )
+sns.scatterplot(
+    x=latent_rae[emph_index,0].detach().numpy(),
+    y=latent_rae[emph_index,1].detach().numpy(),
+    c=[f"C{k}" for k in range(num_emph)]
+)
+plt.savefig(figure_directory / "rae_toy_emph.pdf")
+
+# %%
+plt.figure()
+reconstrued_rae_padded, _ = pad_packed_sequence(output_rae)
+for k, i in enumerate(emph_index):
+
+    decoded_rae = reconstrued_rae_padded[:, i][:sequence_lengths[i]]
+    target = target_padded[:, i][:sequence_lengths[i]]
+    
+    plt.plot(decoded_rae.detach().numpy(), color = f'C{k}', linestyle='dashed')
+    plt.plot(target.detach().numpy(), color = f'C{k}')
+
+plt.savefig(figure_directory / "rae_toy_reconstruction.pdf")
+
+# %% Variational Recurrent Autoencoder
+plt.figure()
+plt.plot(t_info_vrae["training_loss"])
+plt.plot(t_info_vrae["validation_loss"])
+plt.savefig(figure_directory / "vrae_toy_loss.pdf")
+
+# %%
+output_vrae = vrae(x_test)
+output_vrae_emph = vrae(emph_packed)
+latent_sample_vrae = output_vrae['qz'].sample()
+latent_emph_samples_vrae = torch.stack([output_vrae_emph['qz'].sample() for _ in range(10_000)])
+observation_sample_vrae = output_vrae['px'].sample()
+
+# %%
+plt.figure()
+sns.scatterplot(
+    x=latent_sample_vrae[:,0].numpy(),
+    y=latent_sample_vrae[:,1].numpy(),
+    size=sequence_lengths.numpy(),
+    hue=target_averages,
+)
+plt.savefig(figure_directory / "vrae_toy_latent.pdf")
+
+
+# %%
+plt.figure()
+sns.scatterplot(
+    x=latent_sample_vrae[:,0].detach().numpy(),
+    y=latent_sample_vrae[:,1].detach().numpy(),
+    size=sequence_lengths.numpy(),
+    hue=target_averages,
+    alpha=0.2,
+    )
+
+for i in range(num_emph):
+    sns.kdeplot(
+        x=latent_emph_samples_vrae[:, i, 0],
+        y=latent_emph_samples_vrae[:, i, 1],
+        levels=2
+    )
+    
+sns.scatterplot(
+    x=latent_sample_vrae[emph_index,0].detach().numpy(),
+    y=latent_sample_vrae[emph_index,1].detach().numpy(),
+    c=[f"C{k}" for k in range(num_emph)],
+    markers="x",
+)
+plt.savefig(figure_directory / "vrae_toy_emph.pdf")
+
+# %%
+plt.figure()
+observation_sample_vrae_packed = PackedSequence(
+    observation_sample_vrae,
+    batch_sizes,
+)
+observation_sample_vrae_packed, _ = pad_packed_sequence(observation_sample_vrae_packed)
+
+for k, i in enumerate(emph_index):
+
+    decoded_vrae = observation_sample_vrae_packed[:, i][:sequence_lengths[i]]
+    target = target_padded[:, i][:sequence_lengths[i]]
+    
+    plt.plot(decoded_vrae.detach().numpy(), color = f'C{k}', linestyle='dashed')
+    plt.plot(target.detach().numpy(), color = f'C{k}')
+
+plt.savefig(figure_directory / "vrae_toy_reconstruction.pdf")
+# %% IAF Variational Recurrent Autoencoder
+plt.figure()
+
+plt.plot(t_info_iaf["training_loss"])
+plt.plot(t_info_iaf["validation_loss"])
+plt.ylim(-6, 20)
+
+plt.savefig(figure_directory / "iaf_toy_loss.pdf")
+
+# %%
+output_iaf = iaf(x_test)
+output_iaf_emph = iaf(emph_packed)
+latent_sample_iaf = output_iaf['z'].detach()
+latent_emph_samples_iaf = torch.stack([iaf(emph_packed)['z'] for i in range(10_000)])
+observation_sample_iaf = output_iaf['px'].sample()
+
+# %%
+plt.figure()
+
+sns.scatterplot(
+    x=latent_sample_iaf[:,0].numpy(),
+    y=latent_sample_iaf[:,1].numpy(),
+    size=sequence_lengths.numpy(),
+    hue=target_averages,
+)
+plt.savefig(figure_directory / "iaf_toy_latent.pdf")
+# %%
+plt.figure()
+sns.scatterplot(
+    x=latent_sample_iaf[:,0].detach().numpy(),
+    y=latent_sample_iaf[:,1].detach().numpy(),
+    size=sequence_lengths.numpy(),
+    hue=target_averages,
+    alpha=0.2,
+    )
+
+for i in range(num_emph):
+    sns.kdeplot(
+        x=latent_emph_samples_iaf[:, i, 0].detach().numpy(),
+        y=latent_emph_samples_iaf[:, i, 1].detach().numpy(),
+        levels=2
+    )
+    
+sns.scatterplot(
+    x=latent_sample_iaf[emph_index,0].detach().numpy(),
+    y=latent_sample_iaf[emph_index,1].detach().numpy(),
+    c=[f"C{k}" for k in range(num_emph)],
+    markers="x",
+)
+plt.savefig(figure_directory / "iaf_emph_loss.pdf")
+
