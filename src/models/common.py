@@ -484,32 +484,7 @@ class Decoder(Module):
         return simple_elementwise_apply(self.output_layer, x)
 
 
-class ParamEncoder(Encoder):
 
-    def __init__(
-        self,
-        input_dim,
-        hidden_size_1,
-        hidden_size_2,
-        latent_features,
-    ):
-        super(ParamEncoder, self).__init__(
-            input_dim=input_dim,
-            hidden_size=hidden_size_1,
-            latent_features=hidden_size_2,
-            )
-
-        self.linear = Linear(
-            in_features=hidden_size_2, 
-            out_features=2*latent_features
-        )
-
-    def forward(self, x):
-        
-        x = super(ParamEncoder, self).forward(x)
-        x = self.linear(x)
-        mu, log_sigma = x.chunk(2, dim=-1)
-        return mu, log_sigma
 
 
 class ReparameterizedDiagonalGaussian(Distribution):
