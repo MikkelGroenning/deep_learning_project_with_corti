@@ -139,24 +139,6 @@ class ModelTrainer(ABC):
             epoch_training_loss = []
             epoch_validation_loss = []
 
-            model.eval()
-
-            with torch.no_grad():
-
-                # For each sentence in validation set
-                for x in validation_loader:
-
-                    x = get_variable(x)
-                    loss = self.get_loss(x)
-
-                    # Update loss
-                    epoch_validation_loss.append(
-                        (
-                            x.batch_sizes[0].numpy(),
-                            get_numpy(loss.detach()),
-                        )
-                    )
-
             model.train()
 
             if progress_bar == 'batch':
@@ -180,6 +162,24 @@ class ModelTrainer(ABC):
                         get_numpy(loss.detach()),
                     )
                 )
+
+            model.eval()
+
+            with torch.no_grad():
+
+                # For each sentence in validation set
+                for x in validation_loader:
+
+                    x = get_variable(x)
+                    loss = self.get_loss(x)
+
+                    # Update loss
+                    epoch_validation_loss.append(
+                        (
+                            x.batch_sizes[0].numpy(),
+                            get_numpy(loss.detach()),
+                        )
+                    )
 
             # Save loss for plot
             weigths, batch_average = zip(*epoch_training_loss)

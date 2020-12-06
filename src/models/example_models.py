@@ -1,5 +1,3 @@
-
-
 import random
 import torch
 import numpy as np
@@ -19,9 +17,7 @@ from src.data.toy import Continuous
 
 from torch.optim import Adam
 
-
 seed = 42
-torch.set_deterministic(True)
 torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
@@ -37,7 +33,7 @@ validation_data = Continuous(num_observations=2000, **data_parameters)
 test_data = Continuous(num_observations=2000, **data_parameters)
 
 batch_size = 100
-max_epochs = 5
+max_epochs = 500
 
 if __name__ == "__main__":
 
@@ -58,7 +54,7 @@ if __name__ == "__main__":
         model=rae,
         optimizer=optimizer,
         batch_size=batch_size,
-        max_epochs=max_epochs,
+        max_epochs=200,
         training_data=train_data,
         validation_data=test_data,
     )
