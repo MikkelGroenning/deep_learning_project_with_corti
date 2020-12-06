@@ -156,7 +156,7 @@ plt.figure()
 
 plt.plot(t_info_iaf["training_loss"])
 plt.plot(t_info_iaf["validation_loss"])
-plt.ylim(-6, 20)
+plt.ylim(-10, 20)
 
 plt.savefig(figure_directory / "iaf_toy_loss.pdf")
 
@@ -202,3 +202,21 @@ sns.scatterplot(
 )
 plt.savefig(figure_directory / "iaf_emph_loss.pdf")
 
+# %%
+plt.figure()
+observation_sample_iaf_packed = PackedSequence(
+    observation_sample_iaf,
+    batch_sizes,
+)
+observation_sample_iaf_packed, _ = pad_packed_sequence(observation_sample_iaf_packed)
+
+for k, i in enumerate(emph_index):
+
+    decoded_iaf = observation_sample_iaf_packed[:, i][:sequence_lengths[i]]
+    target = target_padded[:, i][:sequence_lengths[i]]
+    
+    plt.plot(decoded_iaf.detach().numpy(), color = f'C{k}', linestyle='dashed')
+    plt.plot(target.detach().numpy(), color = f'C{k}')
+
+plt.savefig(figure_directory / "vrae_toy_reconstruction.pdf")
+# %%

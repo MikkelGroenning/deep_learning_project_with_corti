@@ -20,8 +20,8 @@ from src.data.toy import Continuous
 from torch.optim import Adam
 
 
-seed = 42
-torch.set_deterministic(True)
+seed = 43
+
 torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
@@ -61,7 +61,7 @@ iaf = IAF(
     latent_features=2,
     encoder_hidden_size=48,
     decoder_hidden_size=48,
-    flow_depth=3,
+    flow_depth=4,
     flow_hidden_features=48,
     flow_context_features=4,
 )
