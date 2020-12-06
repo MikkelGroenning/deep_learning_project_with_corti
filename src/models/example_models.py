@@ -1,5 +1,3 @@
-
-
 import random
 import torch
 import numpy as np
@@ -37,7 +35,7 @@ validation_data = Continuous(num_observations=2000, **data_parameters)
 test_data = Continuous(num_observations=1000, **data_parameters)
 
 batch_size = 100
-max_epochs = 5
+max_epochs = 500
 
 # Recurrent Autoencoder
 rae = RAE(
@@ -79,7 +77,7 @@ if __name__ == "__main__":
         model=rae,
         optimizer=optimizer,
         batch_size=batch_size,
-        max_epochs=max_epochs,
+        max_epochs=200,
         training_data=train_data,
         validation_data=test_data,
     )
