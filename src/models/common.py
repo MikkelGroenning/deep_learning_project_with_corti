@@ -483,7 +483,6 @@ class Decoder(Module):
 
         return simple_elementwise_apply(self.output_layer, x)
 
-
 class ParamEncoder(Encoder):
 
     def __init__(
@@ -501,7 +500,8 @@ class ParamEncoder(Encoder):
 
         self.linear = Linear(
             in_features=hidden_size_2, 
-            out_features=2*latent_features
+            out_features=2*latent_features,
+            bias=False,
         )
 
     def forward(self, x):

@@ -92,6 +92,7 @@ class Encoder_(Encoder):
         self.linear = Linear(
             in_features=hidden_size_2,
             out_features=2 * latent_features + context_features,
+            bias=False,
         )
 
     def forward(self, x):

@@ -57,7 +57,7 @@ iaf = IAF(
     latent_features=2,
     encoder_hidden_size=48,
     decoder_hidden_size=48,
-    flow_depth=3,
+    flow_depth=4,
     flow_hidden_features=48,
     flow_context_features=4,
 )

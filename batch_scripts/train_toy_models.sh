@@ -10,5 +10,7 @@
  #BSUB -o logs/%J.out
  #BSUB -e logs/%J.err
  
- echo "Running script..."
+ echo "Training models"
  python3 src/models/example_models.py
+ echo "Plotting results"
+ python3 src/visualization/toy.py
