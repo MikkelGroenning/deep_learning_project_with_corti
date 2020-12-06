@@ -2,6 +2,7 @@ import sys
 from abc import ABC, abstractmethod
 from itertools import chain
 from pathlib import Path
+from typing import Dict, Tuple
 
 import numpy as np
 import torch
@@ -430,15 +431,22 @@ class Encoder(Module):
 
         self.rnn2 = LSTM(
             input_size=self.hidden_size,
-            hidden_size=self.latent_features
+            hidden_size=self.hidden_size
+        )
+
+        self.linear = Linear(
+            in_features=hidden_size,
+            out_features=latent_features,
+            bias=False,
         )
 
     def forward(self, x):
 
         x, (hidden_n, _) = self.rnn1(x)
         x, (hidden_n, _) = self.rnn2(x)
+        x = self.linear(hidden_n[-1])
 
-        return hidden_n[-1]
+        return x
 
 
 # Decoder defitinion
@@ -483,34 +491,6 @@ class Decoder(Module):
 
         return simple_elementwise_apply(self.output_layer, x)
 
-class ParamEncoder(Encoder):
-
-    def __init__(
-        self,
-        input_dim,
-        hidden_size_1,
-        hidden_size_2,
-        latent_features,
-    ):
-        super(ParamEncoder, self).__init__(
-            input_dim=input_dim,
-            hidden_size=hidden_size_1,
-            latent_features=hidden_size_2,
-            )
-
-        self.linear = Linear(
-            in_features=hidden_size_2, 
-            out_features=2*latent_features,
-            bias=False,
-        )
-
-    def forward(self, x):
-        
-        x = super(ParamEncoder, self).forward(x)
-        x = self.linear(x)
-        mu, log_sigma = x.chunk(2, dim=-1)
-        return mu, log_sigma
-
 
 class ReparameterizedDiagonalGaussian(Distribution):
     """
@@ -540,3 +520,48 @@ class ReparameterizedDiagonalGaussian(Distribution):
     def log_prob(self, z: Tensor) -> Tensor:
         """return the log probability: log `p(z)`"""
         return torch.distributions.normal.Normal(self.mu, self.sigma).log_prob(z)
+
+
+class VariationalInference(Module):
+    def __init__(self, beta: float = 1.0):
+        super().__init__()
+        self.beta = beta
+
+    def forward(self, model: Module, x: Tensor) -> Tuple[Tensor, Dict]:
+
+        # forward pass through the model
+        outputs = model(x)
+
+        # unpack outputs
+
+        pz = outputs['pz'] # Prior
+        z = outputs['z'] # Sample from posterior
+        px = outputs['px'] # Observation model
+
+        if 'lz' in outputs:
+            lz = outputs['lz'] # Log likelihood of sample from approx. posterior
+            log_qz = lz / len(z)
+        else:
+            qz = outputs['qz'] # Approx. posterior
+            log_qz = qz.log_prob(z).mean()
+
+
+        log_px = px.log_prob(x.data).sum() / len(z)
+        log_pz = pz.log_prob(z).mean()
+
+        # compute the ELBO with and without the beta parameter:
+        # `L^\beta = E_q [ log p(x|z) - \beta * D_KL(q(z|x) | p(z))`
+        # where `D_KL(q(z|x) | p(z)) = log q(z|x) - log p(z)`
+        kl = log_qz - log_pz
+
+        elbo = log_px - kl
+        beta_elbo = log_px - self.beta * kl
+
+        loss = -beta_elbo
+
+        # prepare the output
+        with torch.no_grad():
+            diagnostics = {"elbo": elbo, "log_px": log_px, "kl": kl}
+
+        return loss, diagnostics, outputs
+
