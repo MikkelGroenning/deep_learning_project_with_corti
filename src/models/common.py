@@ -14,6 +14,8 @@ from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence
 from torch.tensor import Tensor
 from tqdm import tqdm, trange
 
+from torch.nn.utils import clip_grad_norm_
+
 cuda = torch.cuda.is_available()
 if cuda:
     device = torch.device("cuda")
@@ -71,6 +73,7 @@ class ModelTrainer(ABC):
         batch_size,
         training_data,
         validation_data=None,
+        clip_max_norm=None,
     ):
 
         # Input parameters
@@ -80,6 +83,8 @@ class ModelTrainer(ABC):
         self.batch_size = batch_size
         self.training_data = training_data
         self.validation_data = validation_data
+
+        self.clip_max_norm=clip_max_norm
 
         # Data loaders
         self.train_loader = get_loader(self.training_data, batch_size)
@@ -155,6 +160,10 @@ class ModelTrainer(ABC):
 
                 optimizer.zero_grad()
                 loss.backward()
+
+                if self.clip_max_norm is not None:
+                    clip_grad_norm_(model.parameters(), self.clip_max_norm)
+
                 optimizer.step()
 
                 epoch_training_loss.append(

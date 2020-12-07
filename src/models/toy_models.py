@@ -27,7 +27,7 @@ validation_data = Continuous(num_observations=2000, **data_parameters)
 test_data = Continuous(num_observations=1000, **data_parameters)
 
 batch_size = 100
-max_epochs = 1000
+max_epochs = 500
 
 # Recurrent Autoencoder
 rae = RAE(
@@ -69,9 +69,10 @@ if __name__ == "__main__":
         model=rae,
         optimizer=optimizer,
         batch_size=batch_size,
-        max_epochs=min(max_epochs, 400),
+        max_epochs=max_epochs,
         training_data=train_data,
         validation_data=test_data,
+        clip_max_norm=0.15,
     )
     mt.model_name = "ToyRAE"
     mt.restore_checkpoint()
@@ -91,6 +92,7 @@ if __name__ == "__main__":
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=test_data,
+        clip_max_norm=0.15,
     )
     mt.model_name = "ToyVRAE"
     mt.restore_checkpoint()
@@ -98,7 +100,7 @@ if __name__ == "__main__":
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.0005,
+        "lr": 0.001,
     }
     vi = VariationalInference()
     optimizer = Adam(vrae_iaf.parameters(), **optimizer_parameters)
@@ -110,6 +112,7 @@ if __name__ == "__main__":
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=test_data,
+        clip_max_norm=0.15,
     )
     mt.model_name = "ToyVRAEIAF"
     mt.restore_checkpoint()
