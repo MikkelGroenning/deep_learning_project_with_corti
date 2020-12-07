@@ -5,7 +5,8 @@ import torch
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence, pack_padded_sequence
 import random
 
-from src.models.example_models import rae, vrae, iaf, test_data
+from src.models.toy_models import rae, vrae, test_data
+from src.models.toy_models import vrae_iaf as iaf
 from src.models.common import get_trained_model, get_loader
 
 import matplotlib.pyplot as plt
@@ -34,7 +35,7 @@ emph_packed = pack_padded_sequence( target_padded[:,emph_index,:], sequence_leng
 
 rae, t_info_rae = get_trained_model(rae, model_name="ToyRAE", training_info=True)
 vrae, t_info_vrae = get_trained_model(vrae, model_name="ToyVRAE", training_info=True)
-iaf, t_info_iaf = get_trained_model(iaf, model_name="ToyIAF", training_info=True)
+iaf, t_info_iaf = get_trained_model(iaf, model_name="ToyVRAEIAF", training_info=True)
 
 # %% Recurrent Autoencoder
 plt.figure()
@@ -200,7 +201,7 @@ sns.scatterplot(
     c=[f"C{k}" for k in range(num_emph)],
     markers="x",
 )
-plt.savefig(figure_directory / "iaf_emph_loss.pdf")
+plt.savefig(figure_directory / "iaf_toy_emph.pdf")
 
 # %%
 plt.figure()
@@ -218,5 +219,5 @@ for k, i in enumerate(emph_index):
     plt.plot(decoded_iaf.detach().numpy(), color = f'C{k}', linestyle='dashed')
     plt.plot(target.detach().numpy(), color = f'C{k}')
 
-plt.savefig(figure_directory / "vrae_toy_reconstruction.pdf")
+plt.savefig(figure_directory / "iaf_toy_reconstruction.pdf")
 # %%

@@ -3,7 +3,8 @@ from math import log, pi
 
 import torch
 from src.models.common import (Decoder, EmbeddingPacked, Encoder,
-                               ReparameterizedDiagonalGaussian)
+                               ReparameterizedDiagonalGaussian,
+                               )
 from src.models.made import AutoRegressiveNN
 from torch import Tensor
 from torch.distributions import Distribution

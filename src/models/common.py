@@ -424,29 +424,25 @@ class Encoder(Module):
         self.hidden_size = hidden_size
         self.latent_features = latent_features
 
-        self.rnn1 = LSTM(
+        self.rnn = LSTM(
             input_size=self.input_dim,
-            hidden_size=self.hidden_size
-        )
-
-        self.rnn2 = LSTM(
-            input_size=self.hidden_size,
-            hidden_size=self.hidden_size
+            hidden_size=self.hidden_size,
+            num_layers=2,
         )
 
         self.linear = Linear(
-            in_features=hidden_size,
-            out_features=latent_features,
+            in_features=self.hidden_size,
+            out_features=self.latent_features,
             bias=False,
         )
 
     def forward(self, x):
 
-        x, (hidden_n, _) = self.rnn1(x)
-        x, (hidden_n, _) = self.rnn2(x)
+        x, (hidden_n, _) = self.rnn(x)
         x = self.linear(hidden_n[-1])
 
         return x
+
 
 
 # Decoder defitinion

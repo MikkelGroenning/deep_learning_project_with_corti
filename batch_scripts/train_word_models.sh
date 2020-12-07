@@ -1,14 +1,14 @@
  #!/bin/sh
  #BSUB -q gpuv100
  #BSUB -gpu "num=1"
- #BSUB -J train_rae_words
+ #BSUB -J train_words
  #BSUB -n 1
  #BSUB -W 5:00
  #BSUB -B
  #BSUB -N
- #BSUB -R "rusage[mem=16GB]"
+ #BSUB -R "rusage[mem=4GB]"
  #BSUB -o logs/%J.out
  #BSUB -e logs/%J.err
  
  echo "Running script..."
- python3 src/models/rae_words.py
+ python3 src/models/word_models.py

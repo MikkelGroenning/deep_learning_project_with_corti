@@ -13,10 +13,9 @@ seed = 43
 
 data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
-# n_obs = len(data)
-n_obs = 1000
-batch_size = 100
-max_epochs = 5
+n_obs = len(data)
+batch_size = 256
+max_epochs = 500
 
 indices = list(range(n_obs))
 random.shuffle(indices)
@@ -78,7 +77,7 @@ if __name__ == "__main__":
     )
     mt.model_name = "CharacterRAE"
     mt.restore_checkpoint()
-    mt.train(progress_bar="epoch")
+    mt.train()
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
@@ -97,7 +96,7 @@ if __name__ == "__main__":
     )
     mt.model_name = "CharacterVRAE"
     mt.restore_checkpoint()
-    mt.train("epoch")
+    mt.train()
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {

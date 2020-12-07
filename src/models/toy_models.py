@@ -10,7 +10,7 @@ from src.models.vrae import VRAE
 from torch.nn import MSELoss
 from torch.optim import Adam
 
-seed = 43
+seed = 42
 
 torch.manual_seed(seed)
 np.random.seed(seed)
@@ -22,12 +22,12 @@ data_parameters = {
 }
 
 
-train_data = Continuous(num_observations=10_000, **data_parameters)
+train_data = Continuous(num_observations=5_000, **data_parameters)
 validation_data = Continuous(num_observations=2000, **data_parameters)
 test_data = Continuous(num_observations=1000, **data_parameters)
 
 batch_size = 100
-max_epochs = 500
+max_epochs = 1000
 
 # Recurrent Autoencoder
 rae = RAE(
@@ -46,14 +46,14 @@ vrae = VRAE(
 )
 
 # Variational Recurrent Autoencoder using IAF
-iaf = VRAEIAF(
+vrae_iaf = VRAEIAF(
     input_dim=1,
     latent_features=2,
     encoder_hidden_size=48,
     decoder_hidden_size=48,
     flow_depth=4,
-    flow_hidden_features=48,
-    flow_context_features=4,
+    flow_hidden_features=48, 
+    flow_context_features=2,
 )
 
 if __name__ == "__main__":
@@ -69,7 +69,7 @@ if __name__ == "__main__":
         model=rae,
         optimizer=optimizer,
         batch_size=batch_size,
-        max_epochs=200,
+        max_epochs=min(max_epochs, 400),
         training_data=train_data,
         validation_data=test_data,
     )
@@ -98,13 +98,13 @@ if __name__ == "__main__":
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.001,
+        "lr": 0.0005,
     }
     vi = VariationalInference()
-    optimizer = Adam(iaf.parameters(), **optimizer_parameters)
+    optimizer = Adam(vrae_iaf.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
-        model=iaf,
+        model=vrae_iaf,
         optimizer=optimizer,
         batch_size=batch_size,
         max_epochs=max_epochs,

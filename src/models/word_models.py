@@ -15,8 +15,8 @@ data = torch.load("data/processed/200316_embedding.pkl")
 embedding_dim = 300
 
 n_obs = len(data)
-batch_size = 100
-max_epochs = 5
+batch_size = 256
+max_epochs = 500
 
 indices = list(range(n_obs))
 random.shuffle(indices)
@@ -40,9 +40,9 @@ word_rae = RAE(
 # Variational Recurrent Autoencoder
 word_vrae = VRAE(
     input_dim=embedding_dim,
-    latent_features=77,
-    encoder_hidden_size=55,
-    decoder_hidden_size=66,
+    latent_features=64,
+    encoder_hidden_size=128,
+    decoder_hidden_size=128,
 )
 
 # Variational Recurrent Autoencoder using IAF
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     )
     mt.model_name = "WordRAE"
     mt.restore_checkpoint()
-    mt.train(progress_bar="epoch")
+    mt.train()
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     )
     mt.model_name = "WordVRAE"
     mt.restore_checkpoint()
-    mt.train(progress_bar="epoch")
+    mt.train()
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
@@ -113,4 +113,4 @@ if __name__ == "__main__":
     )
     mt.model_name = "WordVRAEIAF"
     mt.restore_checkpoint()
-    mt.train(progress_bar="epoch")
+    mt.train()
