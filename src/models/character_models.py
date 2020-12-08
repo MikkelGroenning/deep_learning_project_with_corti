@@ -80,7 +80,7 @@ def train_rae(retrain=False):
     mt.model_name = "CharacterRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train(progress_bar="batch")
+    mt.train()
 
 
 def train_vrae(retrain=False):
