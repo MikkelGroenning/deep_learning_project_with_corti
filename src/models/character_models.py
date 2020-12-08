@@ -1,3 +1,4 @@
+import argparse
 import random
 
 import pandas as pd
@@ -58,8 +59,8 @@ character_vrae_iaf = VRAEIAFWithEmbedder(
     flow_context_features=8,
 )
 
-if __name__ == "__main__":
 
+def train_rae(retrain=False):
     # Recurrent Autoencoder
     optimizer_parameters = {
         "lr": 0.0005,
@@ -77,8 +78,12 @@ if __name__ == "__main__":
         clip_max_norm=0.15,
     )
     mt.model_name = "CharacterRAE"
-    mt.restore_checkpoint()
-    mt.train()
+    if not retrain:
+        mt.restore_checkpoint()
+    mt.train(progress_bar="batch")
+
+
+def train_vrae(retrain=False):
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
@@ -97,8 +102,12 @@ if __name__ == "__main__":
         clip_max_norm=0.15,
     )
     mt.model_name = "CharacterVRAE"
-    mt.restore_checkpoint()
+    if not retrain:
+        mt.restore_checkpoint()
     mt.train()
+
+
+def train_vrae_iaf(retrain=False):
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
@@ -117,5 +126,33 @@ if __name__ == "__main__":
         clip_max_norm=0.15,
     )
     mt.model_name = "CharacterVRAEIAF"
-    mt.restore_checkpoint()
+    if not retrain:
+        mt.restore_checkpoint()
     mt.train()
+
+
+if __name__ == "__main__":
+
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "models",
+        nargs="?",
+        help="models to train",
+        default=["CharacterRAE", "CharacterVRAE", "CharacterVRAEIAF"],
+    )
+    parser.add_argument(
+        "--retrain",
+        action="store_true",
+        default=False,
+        help="retrain the models",
+    )
+    args = parser.parse_args()
+
+    if "CharacterRAE" in args.models:
+        train_rae(retrain=args.retrain)
+    if "CharacterVRAE" in args.models:
+        train_vrae(retrain=args.retrain)
+    if "CharacterVRAEIAF" in args.models:
+        train_vrae_iaf(retrain=args.retrain)
+

@@ -1,3 +1,4 @@
+from os import X_OK
 import random
 
 import torch
@@ -8,6 +9,8 @@ from src.models.rae import RAE
 from src.models.vrae import VRAE
 from torch.nn.modules.loss import MSELoss
 from torch.optim import Adam
+
+import argparse
 
 seed = 43
 
@@ -56,8 +59,8 @@ word_vrae_iaf = VRAEIAF(
     flow_context_features=8,
 )
 
-if __name__ == "__main__":
 
+def train_rae(retrain=False):
     # Recurrent Autoencoder
     optimizer_parameters = {
         "lr": 0.0005,
@@ -75,8 +78,12 @@ if __name__ == "__main__":
         clip_max_norm=0.15,
     )
     mt.model_name = "WordRAE"
-    mt.restore_checkpoint()
+    if not retrain:
+        mt.restore_checkpoint()
     mt.train()
+
+
+def train_vrae(retrain=False):
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
@@ -95,8 +102,12 @@ if __name__ == "__main__":
         clip_max_norm=0.15,
     )
     mt.model_name = "WordVRAE"
-    mt.restore_checkpoint()
+    if not retrain:
+        mt.restore_checkpoint()
     mt.train()
+
+
+def train_vrae_iaf(retrain=False):
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
@@ -115,5 +126,31 @@ if __name__ == "__main__":
         clip_max_norm=0.15,
     )
     mt.model_name = "WordVRAEIAF"
-    mt.restore_checkpoint()
+    if not retrain:
+        mt.restore_checkpoint()
     mt.train()
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "models",
+        nargs="?",
+        help="models to train",
+        default=["WordRAE", "WordVRAE", "WordVRAEIAF"],
+    )
+    parser.add_argument(
+        "--retrain",
+        action="store_true",
+        default=False,
+        help="retrain the models",
+    )
+    args = parser.parse_args()
+
+    if "WordRAE" in args.models:
+        train_rae(retrain=args.retrain)
+    if "WordVRAE" in args.models:
+        train_vrae(retrain=args.retrain)
+    if "WordVRAEIAF" in args.models:
+        train_vrae_iaf(retrain=args.retrain)

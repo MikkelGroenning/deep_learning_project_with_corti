@@ -1,4 +1,4 @@
-.PHONY: clean environment requirements updaupdate-environment toy-models
+.PHONY: clean environment requirements updaupdate-environment toy-models models
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -32,14 +32,22 @@ clean:
 toy-models: 
 	bsub < batch_scripts/train_toy_models.sh 
 
-character-models: 
-	bsub < batch_scripts/train_character_models.sh 
 
-word-models: 
-	bsub < batch_scripts/train_word_models.sh 
+models: word-models character-models
 
+word-models: models/WordRAE/checkpoint.pt \
+	models/WordVRAE/checkpoint.pt models/WordVRAEIAF/checkpoint.pt
 
+models/Word%/checkpoint.pt: batch_scripts/train_Word$*.sh # FORCE
+	bsub < batch_scripts/train_Word$*.sh 
+	
+character-models: models/CharacterRAE/checkpoint.pt \
+	models/CharacterVRAE/checkpoint.pt models/CharacterVRAEIAF/checkpoint.pt
 
+models/Character%/checkpoint.pt: # FORCE
+	bsub < batch_scripts/train_Character$*.sh 
+
+# FORCE:
 
 #################################################################################
 # Self Documenting Commands                                                     #
