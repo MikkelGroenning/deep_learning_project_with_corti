@@ -217,6 +217,8 @@ class ModelTrainer(ABC):
 
             self.save_checkpoint()
 
+        (model_directory / self.model_name / "finished").touch()
+
     def save_checkpoint(self):
 
         loc = model_directory / self.model_name
