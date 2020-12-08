@@ -52,7 +52,7 @@ vrae_iaf = VRAEIAF(
     encoder_hidden_size=48,
     decoder_hidden_size=48,
     flow_depth=4,
-    flow_hidden_features=48, 
+    flow_hidden_features=16, 
     flow_context_features=2,
 )
 
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.001,
+        "lr": 0.0005,
     }
     criterion = MSELoss(reduction="sum")
     optimizer = Adam(rae.parameters(), **optimizer_parameters)
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.001,
+        "lr": 0.0005,
     }
     vi = VariationalInference()
     optimizer = Adam(vrae.parameters(), **optimizer_parameters)
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.001,
+        "lr": 0.0005,
     }
     vi = VariationalInference()
     optimizer = Adam(vrae_iaf.parameters(), **optimizer_parameters)

@@ -1,4 +1,4 @@
-.PHONY: clean environment requirements updaupdate-environment
+.PHONY: clean environment requirements updaupdate-environment toy-models
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -28,6 +28,18 @@ hpc-requirements:
 clean:
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
+
+toy-models: 
+	bsub < batch_scripts/train_toy_models.sh 
+
+character-models: 
+	bsub < batch_scripts/train_character_models.sh 
+
+word-models: 
+	bsub < batch_scripts/train_word_models.sh 
+
+
+
 
 #################################################################################
 # Self Documenting Commands                                                     #

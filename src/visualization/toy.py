@@ -90,6 +90,8 @@ plt.savefig(figure_directory / "rae_toy_reconstruction.pdf")
 plt.figure()
 plt.plot(t_info_vrae["training_loss"])
 plt.plot(t_info_vrae["validation_loss"])
+
+plt.ylim(top=10, bottom=-20)
 plt.savefig(figure_directory / "vrae_toy_loss.pdf")
 
 # %%
@@ -157,7 +159,7 @@ plt.figure()
 
 plt.plot(t_info_iaf["training_loss"])
 plt.plot(t_info_iaf["validation_loss"])
-plt.ylim(-10, 20)
+plt.ylim(top=10, bottom=-20)
 
 plt.savefig(figure_directory / "iaf_toy_loss.pdf")
 

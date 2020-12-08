@@ -6,7 +6,7 @@
  #BSUB -W 5:00
  #BSUB -B
  #BSUB -N
- #BSUB -R "rusage[mem=4GB]"
+ #BSUB -R "rusage[mem=16GB]"
  #BSUB -o logs/%J.out
  #BSUB -e logs/%J.err
  
