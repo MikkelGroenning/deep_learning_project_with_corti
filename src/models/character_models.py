@@ -15,7 +15,7 @@ seed = 43
 data = pd.read_pickle("data/interim/hydrated/200316.pkl")
 
 n_obs = len(data)
-batch_size = 500
+batch_size = 512
 max_epochs = 500
 
 indices = list(range(n_obs))
@@ -33,27 +33,27 @@ test_data = TwitterDataChars(data.iloc[indices[-num_test:]].copy())
 character_rae = RAEWithEmbedder(
     input_dim=len(alphabet),
     embedding_dim=8,
-    latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=32,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder
 character_vrae = VRAEWithEmbedder(
     input_dim=len(alphabet),
     embedding_dim=8,
-    latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=32,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder using IAF
 character_vrae_iaf = VRAEIAFWithEmbedder(
     input_dim=len(alphabet),
     embedding_dim=8,
-    latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=32,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
     flow_depth=6,
     flow_hidden_features=64,
     flow_context_features=8,
@@ -63,7 +63,7 @@ character_vrae_iaf = VRAEIAFWithEmbedder(
 def train_rae(retrain=False):
     # Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.0005,
+        "lr": 0.001,
     }
     criterion = CrossEntropyLoss(reduction="sum")
     optimizer = Adam(character_rae.parameters(), **optimizer_parameters)
@@ -75,7 +75,7 @@ def train_rae(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.15,
+        clip_max_norm=0.25,
     )
     mt.model_name = "CharacterRAE"
     if not retrain:
@@ -87,7 +87,7 @@ def train_vrae(retrain=False):
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.0005,
+        "lr": 0.001,
     }
     vi = VariationalInference()
     optimizer = Adam(character_vrae.parameters(), **optimizer_parameters)
@@ -99,7 +99,7 @@ def train_vrae(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.15,
+        clip_max_norm=0.25,
     )
     mt.model_name = "CharacterVRAE"
     if not retrain:
@@ -111,7 +111,7 @@ def train_vrae_iaf(retrain=False):
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.0005,
+        "lr": 0.001,
     }
     vi = VariationalInference()
     optimizer = Adam(character_vrae_iaf.parameters(), **optimizer_parameters)
@@ -123,7 +123,7 @@ def train_vrae_iaf(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.15,
+        clip_max_norm=0.25,
     )
     mt.model_name = "CharacterVRAEIAF"
     if not retrain:

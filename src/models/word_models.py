@@ -35,25 +35,25 @@ test_data = TwitterDataWords([data[i] for i in indices[-num_test:]])
 # Recurrent Autoencoder
 word_rae = RAE(
     input_dim=embedding_dim,
-    latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=32,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder
 word_vrae = VRAE(
     input_dim=embedding_dim,
-    latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=32,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder using IAF
 word_vrae_iaf = VRAEIAF(
     input_dim=embedding_dim,
-    latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=32,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
     flow_depth=6,
     flow_hidden_features=64,
     flow_context_features=8,
@@ -63,7 +63,7 @@ word_vrae_iaf = VRAEIAF(
 def train_rae(retrain=False):
     # Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.0005,
+        "lr": 0.001,
     }
     criterion = MSELoss(reduction="sum")
     optimizer = Adam(word_rae.parameters(), **optimizer_parameters)
@@ -75,7 +75,7 @@ def train_rae(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.15,
+        clip_max_norm=0.25,
     )
     mt.model_name = "WordRAE"
     if not retrain:
@@ -87,7 +87,7 @@ def train_vrae(retrain=False):
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.0005,
+        "lr": 0.001,
     }
     vi = VariationalInference()
     optimizer = Adam(word_vrae.parameters(), **optimizer_parameters)
@@ -99,7 +99,7 @@ def train_vrae(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.15,
+        clip_max_norm=0.25,
     )
     mt.model_name = "WordVRAE"
     if not retrain:
@@ -111,7 +111,7 @@ def train_vrae_iaf(retrain=False):
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.0005,
+        "lr": 0.001,
     }
     vi = VariationalInference()
     optimizer = Adam(word_vrae_iaf.parameters(), **optimizer_parameters)
@@ -123,7 +123,7 @@ def train_vrae_iaf(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.15,
+        clip_max_norm=0.25,
     )
     mt.model_name = "WordVRAEIAF"
     if not retrain:
