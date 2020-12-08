@@ -18,7 +18,7 @@ data = torch.load("data/processed/200316_embedding.pkl")
 embedding_dim = 300
 
 n_obs = len(data)
-batch_size = 500
+batch_size = 512
 max_epochs = 500
 
 indices = list(range(n_obs))
