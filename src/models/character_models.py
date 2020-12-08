@@ -136,10 +136,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "models",
+        "model",
         nargs="?",
-        help="models to train",
-        default=["CharacterRAE", "CharacterVRAE", "CharacterVRAEIAF"],
+        help="model to train",
+        default=None,
     )
     parser.add_argument(
         "--retrain",
@@ -149,10 +149,16 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if "CharacterRAE" in args.models:
+    if args.model is None:
         train_rae(retrain=args.retrain)
-    if "CharacterVRAE" in args.models:
         train_vrae(retrain=args.retrain)
-    if "CharacterVRAEIAF" in args.models:
         train_vrae_iaf(retrain=args.retrain)
+    elif "CharacterRAE" == args.model:
+        train_rae(retrain=args.retrain)
+    elif "CharacterVRAE" == args.model:
+        train_vrae(retrain=args.retrain)
+    elif "CharacterVRAEIAF" == args.model:
+        train_vrae_iaf(retrain=args.retrain)
+
+
 
