@@ -1,5 +1,4 @@
-from os import X_OK
-import random
+
 
 import torch
 from src.data.words import TwitterDataWords

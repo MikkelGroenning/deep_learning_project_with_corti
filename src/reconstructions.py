@@ -49,7 +49,7 @@ for i, length in zip(range(num_samples), sequence_lengths):
     decoded_tweet_iaf = sample_iaf_padded[:, i]
 
     target_tweet = target_padded[:, i]
-
+ 
     print("   RAE: " + "".join(alphabet[j] for j in decoded_tweet_rae[:length])[slc])
     print("  VRAE: " + "".join(alphabet[j] for j in decoded_tweet_vrae[:length])[slc])
     print("   IAF: " + "".join(alphabet[j] for j in decoded_tweet_iaf[:length])[slc])
