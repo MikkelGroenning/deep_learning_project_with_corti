@@ -20,7 +20,7 @@ vrae_iaf, t_info_rae = get_trained_model(
     vrae_iaf, training_info=True, model_name="CharacterVRAEIAF"
 )
 
-num_samples = 10
+num_samples = 5
 test_loader = get_loader(test_data, batch_size=num_samples)
 
 x_test = next(iter(test_loader))

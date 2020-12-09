@@ -1,8 +1,11 @@
+import numpy as np
 import seaborn as sns
 import torch
 from torch.nn.utils.rnn import PackedSequence, pad_packed_sequence
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+
+from pathlib import Path
 
 from src.data.common import get_loader
 from src.models.character_models import (
@@ -18,6 +21,10 @@ from src.models.common import VariationalInference, get_trained_model
 from src.models.word_models import test_data as test_data_words
 from src.models.word_models import trump_data as trump_data_words
 from src.models.word_models import word_rae, word_vrae, word_vrae_iaf, MSELoss
+
+sns.set_style("whitegrid")
+
+overleaf_directory = Path( 'overleaf' ) / "poster" 
 
 character_rae = get_trained_model(character_rae, model_name="CharacterRAE")
 character_vrae = get_trained_model(character_vrae, model_name="CharacterVRAE")
@@ -50,6 +57,7 @@ ll_in_distribution = {
     "word_vrae_iaf": [],
 }
 
+
 ll_out_of_distribution = {
     "character_rae": [],
     "character_vrae": [],
@@ -59,11 +67,18 @@ ll_out_of_distribution = {
     "word_vrae_iaf": [],
 }
 
-for x, _ in zip(tqdm(character_loader), range(1000)):
+elbo = {
+    "character_vrae": [],
+    "character_vrae_iaf": [],
+    "word_vrae": [],
+    "word_vrae_iaf": [],
+}
+
+for x in tqdm(character_loader):
 
     loss_packed_rae = ce_loss(character_rae(x).data, x.data)
-    loss_packed_vrae, _, _ = vi(character_vrae, x)
-    loss_packed_vrae_iaf, diagnostics, _ = vi(character_vrae_iaf, x)
+    loss_packed_vrae, diag_vrae, _ = vi(character_vrae, x)
+    loss_packed_vrae_iaf, diag_vrae_iaf, _ = vi(character_vrae_iaf, x)
 
     ll_in_distribution["character_rae"].append(
         -float(loss_packed_rae) / len(x.data),
@@ -75,7 +90,10 @@ for x, _ in zip(tqdm(character_loader), range(1000)):
         -float(loss_packed_vrae_iaf) / len(x.data)
     )
 
-for x, _ in zip(tqdm(character_loader_trump), range(1000)):
+    elbo["character_vrae"]
+    elbo["character_vrae_iaf"]
+
+for x in tqdm(character_loader_trump):
 
     loss_packed_rae = ce_loss(character_rae(x).data, x.data)
     loss_packed_vrae, _, _ = vi(character_vrae, x)
@@ -92,7 +110,7 @@ for x, _ in zip(tqdm(character_loader_trump), range(1000)):
     )
 
 
-for x, _ in zip(tqdm(word_loader), range(1000)):
+for x in tqdm(word_loader):
 
     loss_packed_rae = mse_loss(word_rae(x).data, x.data)
     loss_packed_vrae, _, _ = vi(word_vrae, x)
@@ -108,8 +126,7 @@ for x, _ in zip(tqdm(word_loader), range(1000)):
         -float(loss_packed_vrae_iaf) / len(x.data)
     )
 
-
-for x, _ in zip(tqdm(word_loader_trump), range(1000)):
+for x in tqdm(word_loader_trump):
 
     loss_packed_rae = mse_loss(word_rae(x).data, x.data)
     loss_packed_vrae, _, _ = vi(word_vrae, x)
@@ -124,8 +141,8 @@ for x, _ in zip(tqdm(word_loader_trump), range(1000)):
     ll_out_of_distribution["word_vrae_iaf"].append(
         -float(loss_packed_vrae_iaf) / len(x.data)
     )
-
-fig, _ = plt.subplots(ncols=3, nrows=2, figsize=(14, 8))
+    
+fig, _ = plt.subplots(ncols=3, nrows=2, figsize=(14, 6))
 
 for i, ((model, ood_dist), (_, id_dist)) in enumerate(
     zip(
@@ -133,8 +150,17 @@ for i, ((model, ood_dist), (_, id_dist)) in enumerate(
         ll_in_distribution.items(),
     )
 ):
-    sns.distplot(ood_dist, label="Trump", ax=fig.axes[i], kde=False)
-    sns.distplot(id_dist, label="IId", ax=fig.axes[i], kde=False)
-    fig.axes[i].set_title(model)
+    
+    sns.distplot(id_dist, label="Iid", ax=fig.axes[i], kde=False)
 
-fig.savefig("test.pdf")
+    # Only considering obervations within a reasonable intervand
+    max_ood = max(id_dist) + 1
+    min_ood = min(id_dist) - 3
+
+    ood_filtered = [x for x in ood_dist if x < max_ood and x > min_ood]
+    sns.distplot(ood_filtered, label="Trump", ax=fig.axes[i], kde=False)
+    fig.axes[i].set_title(model)
+    
+fig.tight_layout()
+fig.savefig(overleaf_directory /"figures" / "ood_detection.pdf") 
+
