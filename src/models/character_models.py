@@ -130,6 +130,16 @@ def train_vrae_iaf(retrain=False):
         mt.restore_checkpoint()
     mt.train()
 
+def train_vrae_initizialized():
+
+    # Variational Recurrent Autoencoder using IAF
+    optimizer_parameters = {
+        "lr": 0.001,
+    }
+
+
+
+
 
 if __name__ == "__main__":
 
