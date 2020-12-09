@@ -1,4 +1,4 @@
-.PHONY: clean environment requirements updaupdate-environment toy-models
+.PHONY: clean environment requirements updaupdate-environment toy-models models
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -29,17 +29,28 @@ clean:
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
 
+## Train toy models
 toy-models: 
 	bsub < batch_scripts/train_toy_models.sh 
 
-character-models: 
-	bsub < batch_scripts/train_character_models.sh 
+## Train all models
+models: word-models character-models
 
-word-models: 
-	bsub < batch_scripts/train_word_models.sh 
+## Train all word models
+word-models: models/WordRAE/finished \
+	models/WordVRAE/finished models/WordVRAEIAF/finished
 
+models/Word%/finished: batch_scripts/train_Word%.sh # FORCE
+	bsub < batch_scripts/train_Word$*.sh 
+	# python3 src/models/word_models.py Word$*
 
+## Train all character models
+character-models: models/CharacterRAE/finished \
+	models/CharacterVRAE/finished models/CharacterVRAEIAF/finished
 
+models/Character%/finished: batch_scripts/train_Character%.sh 
+	bsub < batch_scripts/train_Character$*.sh 
+	# python3 src/models/character_models.py Character$*
 
 #################################################################################
 # Self Documenting Commands                                                     #
