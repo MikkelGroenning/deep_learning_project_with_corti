@@ -28,3 +28,4 @@ data_train = data_sampled.iloc[:num_train, :]
 data_validation = data_sampled.iloc[num_train:-num_test, :]
 data_test = data_sampled.iloc[-num_test:, :]
 
+data_trump = pd.read_pickle(Path(f"data/interim/hydrated/trump.pkl"))

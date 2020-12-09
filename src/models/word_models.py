@@ -21,6 +21,7 @@ max_epochs = 500
 train_data = TwitterDataWords(data["train"])
 validation_data = TwitterDataWords(data["validation"])
 test_data = TwitterDataWords(data["test"])
+trump_data = TwitterDataWords(data["trump"])
 
 # Recurrent Autoencoder
 word_rae = RAE(
