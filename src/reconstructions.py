@@ -58,7 +58,3 @@ for i, length in zip(range(num_samples), sequence_lengths):
 
     print("")
 
-
-vi = VariationalInference()
-_, diagnostics, _ = vi(vrae, x_test)
-_, diagnostics, _ = vi(vrae_iaf, x_test)
