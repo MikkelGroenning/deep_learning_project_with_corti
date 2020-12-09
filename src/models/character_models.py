@@ -132,6 +132,8 @@ def train_vrae_iaf(retrain=False):
 
 def train_vrae_initialized(retrain=False):
 
+    get_trained_model(character_rae, model_name="CharacterRAE")
+
     character_vrae.decoder.rnn1.load_state_dict(
         character_rae.decoder.rnn1.state_dict(),
     )
