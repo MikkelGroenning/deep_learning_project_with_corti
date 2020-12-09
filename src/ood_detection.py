@@ -142,7 +142,10 @@ for x in tqdm(word_loader_trump):
         -float(loss_packed_vrae_iaf) / len(x.data)
     )
     
+torch.save([ll_in_distribution, ll_out_of_distribution], "ood_results.pkl")
+
 fig, _ = plt.subplots(ncols=3, nrows=2, figsize=(14, 6))
+
 
 for i, ((model, ood_dist), (_, id_dist)) in enumerate(
     zip(
@@ -161,6 +164,9 @@ for i, ((model, ood_dist), (_, id_dist)) in enumerate(
     sns.distplot(ood_filtered, label="Trump", ax=fig.axes[i], kde=False)
     fig.axes[i].set_title(model)
     
+
+
+
 fig.tight_layout()
 fig.savefig(overleaf_directory /"figures" / "ood_detection.pdf") 
 
