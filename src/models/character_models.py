@@ -10,7 +10,7 @@ from torch.optim import Adam
 
 from src.data.common import data_train, data_validation, data_test
 
-batch_size = 128
+batch_size = 64
 max_epochs = 500
 
 train_data = TwitterDataChars(data_train.copy())
@@ -21,27 +21,27 @@ test_data = TwitterDataChars(data_test.copy())
 character_rae = RAEWithEmbedder(
     input_dim=len(alphabet),
     embedding_dim=8,
-    latent_features=32,
-    encoder_hidden_size=64,
-    decoder_hidden_size=64,
+    latent_features=64,
+    encoder_hidden_size=128,
+    decoder_hidden_size=128,
 )
 
 # Variational Recurrent Autoencoder
 character_vrae = VRAEWithEmbedder(
     input_dim=len(alphabet),
     embedding_dim=8,
-    latent_features=32,
-    encoder_hidden_size=64,
-    decoder_hidden_size=64,
+    latent_features=64,
+    encoder_hidden_size=128,
+    decoder_hidden_size=128,
 )
 
 # Variational Recurrent Autoencoder using IAF
 character_vrae_iaf = VRAEIAFWithEmbedder(
     input_dim=len(alphabet),
     embedding_dim=8,
-    latent_features=32,
-    encoder_hidden_size=64,
-    decoder_hidden_size=64,
+    latent_features=64,
+    encoder_hidden_size=128,
+    decoder_hidden_size=128,
     flow_depth=6,
     flow_hidden_features=64,
     flow_context_features=8,
@@ -51,7 +51,7 @@ character_vrae_iaf = VRAEIAFWithEmbedder(
 def train_rae(retrain=False):
     # Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.001,
+        "lr": 0.005,
     }
     criterion = CrossEntropyLoss(reduction="sum")
     optimizer = Adam(character_rae.parameters(), **optimizer_parameters)
@@ -75,9 +75,9 @@ def train_vrae(retrain=False):
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.001,
+        "lr": 0.005,
     }
-    vi = VariationalInference()
+    vi = VariationalInference(0.1)
     optimizer = Adam(character_vrae.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
@@ -99,9 +99,9 @@ def train_vrae_iaf(retrain=False):
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.001,
+        "lr": 0.005,
     }
-    vi = VariationalInference()
+    vi = VariationalInference(0.1)
     optimizer = Adam(character_vrae_iaf.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
