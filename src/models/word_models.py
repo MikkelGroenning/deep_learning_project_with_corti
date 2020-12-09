@@ -26,27 +26,27 @@ trump_data = TwitterDataWords(data["trump"])
 # Recurrent Autoencoder
 word_rae = RAE(
     input_dim=embedding_dim,
-    latent_features=32,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=64,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder
 word_vrae = VRAE(
     input_dim=embedding_dim,
-    latent_features=32,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=64,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder using IAF
 word_vrae_iaf = VRAEIAF(
     input_dim=embedding_dim,
-    latent_features=32,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    latent_features=64,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
     flow_depth=6,
-    flow_hidden_features=64,
+    flow_hidden_features=32,
     flow_context_features=8,
 )
 
@@ -54,7 +54,7 @@ word_vrae_iaf = VRAEIAF(
 def train_rae(retrain=False):
     # Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.005,
+        "lr": 0.001,
     }
     criterion = MSELoss(reduction="sum")
     optimizer = Adam(word_rae.parameters(), **optimizer_parameters)
@@ -78,7 +78,7 @@ def train_vrae(retrain=False):
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.005,
+        "lr": 0.001,
     }
     vi = VariationalInference(0.1)
     optimizer = Adam(word_vrae.parameters(), **optimizer_parameters)
@@ -102,7 +102,7 @@ def train_vrae_iaf(retrain=False):
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.005,
+        "lr": 0.001,
     }
     vi = VariationalInference(0.1)
     optimizer = Adam(word_vrae_iaf.parameters(), **optimizer_parameters)

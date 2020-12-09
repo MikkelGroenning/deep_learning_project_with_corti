@@ -21,29 +21,29 @@ trump_data = TwitterDataChars(data_trump.copy())
 # Recurrent Autoencoder
 character_rae = RAEWithEmbedder(
     input_dim=len(alphabet),
-    embedding_dim=8,
+    embedding_dim=10,
     latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder
 character_vrae = VRAEWithEmbedder(
     input_dim=len(alphabet),
-    embedding_dim=8,
+    embedding_dim=10,
     latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
 )
 
 # Variational Recurrent Autoencoder using IAF
 character_vrae_iaf = VRAEIAFWithEmbedder(
     input_dim=len(alphabet),
-    embedding_dim=8,
+    embedding_dim=10,
     latent_features=64,
-    encoder_hidden_size=128,
-    decoder_hidden_size=128,
-    flow_depth=6,
+    encoder_hidden_size=64,
+    decoder_hidden_size=64,
+    flow_depth=4,
     flow_hidden_features=64,
     flow_context_features=8,
 )
@@ -52,7 +52,7 @@ character_vrae_iaf = VRAEIAFWithEmbedder(
 def train_rae(retrain=False):
     # Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.005,
+        "lr": 0.001,
     }
     criterion = CrossEntropyLoss(reduction="sum")
     optimizer = Adam(character_rae.parameters(), **optimizer_parameters)
@@ -76,7 +76,7 @@ def train_vrae(retrain=False):
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
-        "lr": 0.005,
+        "lr": 0.001,
     }
     vi = VariationalInference(0.1)
     optimizer = Adam(character_vrae.parameters(), **optimizer_parameters)
@@ -100,7 +100,7 @@ def train_vrae_iaf(retrain=False):
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
-        "lr": 0.005,
+        "lr": 0.001,
     }
     vi = VariationalInference(0.1)
     optimizer = Adam(character_vrae_iaf.parameters(), **optimizer_parameters)

@@ -3,7 +3,7 @@
  #BSUB -gpu "num=1"
  #BSUB -J CharacterRAE
  #BSUB -n 1
- #BSUB -W 8:00
+ #BSUB -W 2:00
  #BSUB -B
  #BSUB -N
  #BSUB -R "rusage[mem=4GB]"
