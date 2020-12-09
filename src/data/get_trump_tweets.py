@@ -11,6 +11,7 @@ from tqdm import tqdm
 from pathlib import Path
 
 
+
 def hydrate_tweets(tweet_ids, filepath, api):
 
     exception_list = []
@@ -79,7 +80,7 @@ def hydrate_tweets(tweet_ids, filepath, api):
     
 
     # Filter
-    tweets_trump[tweets_trump['created_at']<= '2019-12-31']
+    tweets_trump = tweets_trump[tweets_trump['created_at']<= '2019-12-31']
 
     print(f'Writing {tweets_trump} tweets to lenlocal file')
     tweets_trump.to_pickle(filepath)
@@ -102,15 +103,6 @@ def get_trump_tweet_ids(df_trump, filepath):
         print(f'{len(trump_ids)} tweet ids saved.')
 
 
-import pickle
-import gensim
-import pandas as pd
-import numpy as np
-import re
-import torch
-from tqdm import tqdm
-from pathlib import Path
-from hydrate import _pickle_object, _unpickle_object
 
 
 character_set = {
@@ -190,7 +182,7 @@ class Embedder:
             embedding_tweet = torch.from_numpy(
                 np.vstack(
                     [
-                        self.embedder[word]a
+                        self.embedder[word]
                         if word in self.embedder.vocab.keys()
                         else self.average
                         for word in tweet.split() + ['EOS']
