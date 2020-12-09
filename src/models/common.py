@@ -550,11 +550,11 @@ class VariationalInference(Module):
             log_qz = lz / len(z)
         else:
             qz = outputs['qz'] # Approx. posterior
-            log_qz = qz.log_prob(z).mean()
+            log_qz = qz.log_prob(z).sum(dim=1).mean()
 
 
         log_px = px.log_prob(x.data).sum() / len(z)
-        log_pz = pz.log_prob(z).mean()
+        log_pz = pz.log_prob(z).sum(dim=1).mean()
 
         # compute the ELBO with and without the beta parameter:
         # `L^\beta = E_q [ log p(x|z) - \beta * D_KL(q(z|x) | p(z))`
