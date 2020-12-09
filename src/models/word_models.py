@@ -12,25 +12,15 @@ from torch.optim import Adam
 
 import argparse
 
-seed = 43
-
 data = torch.load("data/processed/200316_embedding.pkl")
 embedding_dim = 300
 
-n_obs = len(data)
-batch_size = 512
+batch_size = 128
 max_epochs = 500
 
-indices = list(range(n_obs))
-random.shuffle(indices)
-
-num_train = int(0.6 * n_obs)
-num_validation = int(0.2 * n_obs)
-num_test = n_obs - num_train - num_validation
-
-train_data = TwitterDataWords([data[i] for i in indices[:num_train]])
-validation_data = TwitterDataWords([data[i] for i in indices[num_train:-num_test]])
-test_data = TwitterDataWords([data[i] for i in indices[-num_test:]])
+train_data = TwitterDataWords(data["train"])
+validation_data = TwitterDataWords(data["validation"])
+test_data = TwitterDataWords(data["test"])
 
 # Recurrent Autoencoder
 word_rae = RAE(

@@ -1,33 +1,21 @@
 import argparse
-import random
 
-import pandas as pd
 from src.data.characters import TwitterDataChars, alphabet
-from src.models.common import CriterionTrainer, VariationalInference, VITrainer, get_trained_model
+from src.models.common import CriterionTrainer, VariationalInference, VITrainer
 from src.models.iaf import VRAEIAFWithEmbedder
 from src.models.rae import RAEWithEmbedder
 from src.models.vrae import VRAEWithEmbedder
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 
-seed = 43
+from src.data.common import data_train, data_validation, data_test
 
-data = pd.read_pickle("data/interim/hydrated/200316.pkl")
-
-n_obs = len(data)
-batch_size = 512
+batch_size = 128
 max_epochs = 500
 
-indices = list(range(n_obs))
-random.shuffle(indices)
-
-num_train = int(0.6 * n_obs)
-num_validation = int(0.2 * n_obs)
-num_test = n_obs - num_train - num_validation
-
-train_data = TwitterDataChars(data.iloc[indices[:num_train]].copy())
-validation_data = TwitterDataChars(data.iloc[indices[num_train:-num_test]].copy())
-test_data = TwitterDataChars(data.iloc[indices[-num_test:]].copy())
+train_data = TwitterDataChars(data_train.copy())
+validation_data = TwitterDataChars(data_validation.copy())
+test_data = TwitterDataChars(data_test.copy())
 
 # Recurrent Autoencoder
 character_rae = RAEWithEmbedder(
@@ -130,44 +118,6 @@ def train_vrae_iaf(retrain=False):
         mt.restore_checkpoint()
     mt.train()
 
-def train_vrae_initialized(retrain=False):
-
-    get_trained_model(character_rae, model_name="CharacterRAE")
-
-    character_vrae.decoder.rnn1.load_state_dict(
-        character_rae.decoder.rnn1.state_dict(),
-    )
-    character_vrae.decoder.rnn2.load_state_dict(
-        character_rae.decoder.rnn2.state_dict(),
-    )
-    character_vrae.encoder.rnn.load_state_dict(
-        character_rae.encoder.rnn.state_dict(),
-    )
-    character_vrae.embedding.load_state_dict(
-         character_rae.embedding.state_dict(),
-    )
-
-    # Variational Recurrent Autoencoder
-    optimizer_parameters = {
-        "lr": 0.001,
-    }
-    vi = VariationalInference()
-    optimizer = Adam(character_vrae.parameters(), **optimizer_parameters)
-    mt = VITrainer(
-        vi=vi,
-        model=character_vrae,
-        optimizer=optimizer,
-        batch_size=batch_size,
-        max_epochs=max_epochs,
-        training_data=train_data,
-        validation_data=validation_data,
-        clip_max_norm=0.25,
-    )
-    mt.model_name = "CharacterVRAE_init"
-    if not retrain:
-        mt.restore_checkpoint()
-    mt.train()
-
 if __name__ == "__main__":
 
  
@@ -196,7 +146,3 @@ if __name__ == "__main__":
         train_vrae(retrain=args.retrain)
     elif "CharacterVRAEIAF" == args.model:
         train_vrae_iaf(retrain=args.retrain)
-    elif "CharacterVRAE_init" == args.model:
-        train_vrae_initialized(retrain=args.retrain)
-
-

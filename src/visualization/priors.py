@@ -33,7 +33,6 @@ character_rae.eval()
 character_vrae.eval()
 character_vrae_iaf.eval()
 
-
 for x, _ in zip(character_loader, range(10_000)):
 
     loss_packed_rae = ce_loss(character_rae(x).data, x.data)
@@ -41,7 +40,7 @@ for x, _ in zip(character_loader, range(10_000)):
     loss_packed_vrae_iaf, diagnostics, _ = vi(character_vrae_iaf, x)
 
     print(
-    -float(loss_packed_rae), 
-    -float(loss_packed_vrae), 
-    -float(loss_packed_vrae_iaf)
+    -float(loss_packed_rae)/len(x.data),
+    -float(loss_packed_vrae)/len(x.data),
+    -float(loss_packed_vrae_iaf)/len(x.data)
     )
