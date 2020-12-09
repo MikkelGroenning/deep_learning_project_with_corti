@@ -10,7 +10,6 @@ from src.models.character_models import (
 
 from src.models.common import VariationalInference, get_trained_model
 
-
 rae, t_info_rae = get_trained_model(
     rae, training_info=True, model_name="CharacterRAE"
 )

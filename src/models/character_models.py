@@ -8,7 +8,7 @@ from src.models.vrae import VRAEWithEmbedder
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 
-from src.data.common import data_train, data_validation, data_test
+from src.data.common import data_train, data_validation, data_test, data_trump
 
 batch_size = 128
 max_epochs = 500
@@ -16,6 +16,7 @@ max_epochs = 500
 train_data = TwitterDataChars(data_train.copy())
 validation_data = TwitterDataChars(data_validation.copy())
 test_data = TwitterDataChars(data_test.copy())
+trump_data = TwitterDataChars(data_trump.copy())
 
 # Recurrent Autoencoder
 character_rae = RAEWithEmbedder(
