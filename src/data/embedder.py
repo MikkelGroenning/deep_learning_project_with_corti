@@ -7,6 +7,7 @@ import torch
 from tqdm import tqdm
 from pathlib import Path
 from hydrate import _pickle_object, _unpickle_object
+from src.data.common import data_train, data_validation, data_test, data_sampled
 
 
 character_set = {
@@ -32,6 +33,7 @@ regex_unknown = re.compile(f"[^{ character_set['characters'] }]+")
 
 class Embedder:
     def __init__(self, embedder):
+
         self.embedder = embedder
 
         rsum = np.zeros(300)
@@ -41,16 +43,10 @@ class Embedder:
         self.average = rsum / len(embedder.vocab)
 
     def embed_tweets_by_date(self, date_string):
-        path_hydrated = Path(f"data/interim/hydrated/{date_string}.pkl")
-        path_processed = Path(f"data/interim/hydrated/{date_string}_text_processed.pkl")
-        path_embedded = Path(f"data/processed/{date_string}_embedding.pkl")
 
-        try:
-            tweets = _unpickle_object(path_hydrated)
-        except Exception as e:
-            print(e)
-            print("Date has not been hydrated")
-            raise
+
+        path_embedded = Path(f"data/processed/{date_string}_embedding.pkl")
+        tweets = data_sampled.copy()
 
         for pattern_string, char in regex_html_tags.items():
             tweets["text_processed"] = tweets["text"].str.replace(pattern_string, char)
@@ -73,11 +69,14 @@ class Embedder:
         # Drop empty tweets
         tweets = tweets[tweets.text_processed != '']
 
-        print('save process tweets')
-        # Save the processed data frame
-        tweets.to_pickle(path_processed)
+
+
+        # print('save process tweets')
+        # # Save the processed data frame
+        # tweets.to_pickle(path_processed)
 
         tweets_embedding = []
+
         for tweet in tqdm(tweets["text_processed"], total=len(tweets)):
 
             embedding_tweet = torch.from_numpy(
@@ -93,14 +92,17 @@ class Embedder:
             embedding_tweet = embedding_tweet.type(torch.float)
             tweets_embedding.append(embedding_tweet)
 
-        torch.save(tweets_embedding, path_embedded)
+        embedded_series = pd.Series(tweets_embedding)
+
+        torch.save({
+            "train" : embedded_series.loc[embedded_series.index.intersection(data_train.index)].tolist(),
+            "validation" : embedded_series.loc[embedded_series.index.intersection(data_validation.index)].tolist(),
+            "test" : embedded_series.loc[embedded_series.index.intersection(data_test.index)].tolist()
+        }, path_embedded)
         print('Finished')
 
 if __name__ == "__main__":
 
-    # parser = ArgumentParser()
-    # parser.add_argument("dates", nargs="+")
-    # args = parser.parse_args()
 
     dates = ["200316"]
     word2vec = _unpickle_object("data/processed/Embedding.pickle")
