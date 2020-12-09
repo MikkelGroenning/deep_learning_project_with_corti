@@ -3,7 +3,7 @@ import random
 
 import pandas as pd
 from src.data.characters import TwitterDataChars, alphabet
-from src.models.common import CriterionTrainer, VariationalInference, VITrainer
+from src.models.common import CriterionTrainer, VariationalInference, VITrainer, get_trained_model
 from src.models.iaf import VRAEIAFWithEmbedder
 from src.models.rae import RAEWithEmbedder
 from src.models.vrae import VRAEWithEmbedder
@@ -130,20 +130,45 @@ def train_vrae_iaf(retrain=False):
         mt.restore_checkpoint()
     mt.train()
 
-def train_vrae_initizialized():
+def train_vrae_initialized(retrain=False):
 
-    # Variational Recurrent Autoencoder using IAF
+    character_vrae.decoder.rnn1.load_state_dict(
+        character_rae.decoder.rnn1.state_dict(),
+    )
+    character_vrae.decoder.rnn2.load_state_dict(
+        character_rae.decoder.rnn2.state_dict(),
+    )
+    character_vrae.encoder.rnn.load_state_dict(
+        character_rae.encoder.rnn.state_dict(),
+    )
+    character_vrae.embedding.load_state_dict(
+         character_rae.embedding.state_dict(),
+    )
+
+    # Variational Recurrent Autoencoder
     optimizer_parameters = {
         "lr": 0.001,
     }
-
-
-
-
+    vi = VariationalInference()
+    optimizer = Adam(character_vrae.parameters(), **optimizer_parameters)
+    mt = VITrainer(
+        vi=vi,
+        model=character_vrae,
+        optimizer=optimizer,
+        batch_size=batch_size,
+        max_epochs=max_epochs,
+        training_data=train_data,
+        validation_data=validation_data,
+        clip_max_norm=0.25,
+    )
+    mt.model_name = "CharacterVRAE_init"
+    if not retrain:
+        mt.restore_checkpoint()
+    mt.train()
 
 if __name__ == "__main__":
 
-
+ 
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "model",
@@ -169,6 +194,7 @@ if __name__ == "__main__":
         train_vrae(retrain=args.retrain)
     elif "CharacterVRAEIAF" == args.model:
         train_vrae_iaf(retrain=args.retrain)
-
+    elif "CharacterVRAE_init" == args.model:
+        train_vrae_initialized(retrain=args.retrain)
 
 

@@ -176,7 +176,7 @@ plt.savefig(figure_directory / "iaf_toy_loss.pdf")
 output_iaf = iaf(x_test)
 output_iaf_emph = iaf(emph_packed)
 latent_sample_iaf = output_iaf['z'].detach()
-latent_emph_samples_iaf = torch.stack([iaf(emph_packed)['z'] for i in range(10_000)])
+latent_emph_samples_iaf = torch.stack([iaf(emph_packed)['z'] for _ in range(10_000)])
 observation_sample_iaf = output_iaf['px'].sample()
 
 # %%
@@ -189,7 +189,6 @@ sns.scatterplot(
 )
 axes[2][0].get_legend().remove()
 
-# %%
 sns.scatterplot(
     x=latent_sample_iaf[:,0].detach().numpy(),
     y=latent_sample_iaf[:,1].detach().numpy(),
@@ -216,7 +215,6 @@ sns.scatterplot(
 )
 
 axes[2][1].get_legend().remove()
-# %%
 
 observation_sample_iaf_packed = PackedSequence(
     observation_sample_iaf,
@@ -232,6 +230,6 @@ for k, i in enumerate(emph_index):
     axes[2][2].plot(decoded_iaf.detach().numpy(), color = f'C{k}', linestyle='dashed')
     axes[2][2].plot(target.detach().numpy(), color = f'C{k}')
 
+fig.tight_layout()
 fig.savefig(overleaf_directory / "figures" / "toy_examples" / "toy_performance.pdf")
 fig.savefig(figure_directory / "toy_performance.pdf")
-# %%
