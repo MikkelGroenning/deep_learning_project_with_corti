@@ -82,11 +82,11 @@ if __name__ == "__main__":
         embedding_tweet = embedding_tweet.type(torch.float)
         tweets_embedding.append(embedding_tweet)
 
-    embedded_series = pd.Series(tweets_embedding)
+    embedded_series = pd.Series(tweets_embedding, index=tweets.index)
 
 # %% Embed trump data
 
-    path_embedded_trump = Path(f"data/processed/trump_embedding.pkl")
+    # path_embedded_trump = Path(f"data/processed/trump_embedding.pkl")
     tweets_trump = data_trump.copy()
 
     for pattern_string, char in regex_html_tags.items():
@@ -125,14 +125,12 @@ if __name__ == "__main__":
         embedding_tweet = embedding_tweet.type(torch.float)
         tweets_embedding_trump.append(embedding_tweet)
 
-    embedded_series_trump = pd.Series(tweets_embedding_trump)
-
 # %% Save data
     torch.save({
         "train" : embedded_series.loc[embedded_series.index.intersection(data_train.index)].tolist(),
         "validation" : embedded_series.loc[embedded_series.index.intersection(data_validation.index)].tolist(),
         "test" : embedded_series.loc[embedded_series.index.intersection(data_test.index)].tolist(),
-        "trump" : embedded_series_trump.tolist(),
+        "trump" : tweets_embedding_trump,
     }, path_embedded)
     print('Finished')
 
