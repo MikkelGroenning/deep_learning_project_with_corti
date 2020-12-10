@@ -39,7 +39,7 @@ rae, t_info_rae = get_trained_model(rae, model_name="ToyRAE", training_info=True
 vrae, t_info_vrae = get_trained_model(vrae, model_name="ToyVRAE", training_info=True)
 iaf, t_info_iaf = get_trained_model(iaf, model_name="ToyVRAEIAF", training_info=True)
 
-fig, axes =  plt.subplots(nrows=3, ncols=3, figsize=(14,8))
+fig, axes =  plt.subplots(nrows=3, ncols=3, figsize=(14, 6.5))
 
 # %% Recurrent Autoencoder
 plt.figure()
@@ -97,7 +97,7 @@ plt.plot(t_info_vrae["validation_loss"])
 plt.ylim(top=10, bottom=-20)
 plt.savefig(figure_directory / "vrae_toy_loss.pdf")
 
-# %%
+# %% Sampling
 output_vrae = vrae(x_test)
 output_vrae_emph = vrae(emph_packed)
 latent_sample_vrae = output_vrae['qz'].sample()
@@ -172,7 +172,7 @@ plt.ylim(top=10, bottom=-20)
 
 plt.savefig(figure_directory / "iaf_toy_loss.pdf")
 
-# %%
+# %% sample
 output_iaf = iaf(x_test)
 output_iaf_emph = iaf(emph_packed)
 latent_sample_iaf = output_iaf['z'].detach()
@@ -188,6 +188,8 @@ sns.scatterplot(
     ax=axes[2][0],
 )
 axes[2][0].get_legend().remove()
+
+
 
 sns.scatterplot(
     x=latent_sample_iaf[:,0].detach().numpy(),
@@ -216,6 +218,7 @@ sns.scatterplot(
 
 axes[2][1].get_legend().remove()
 
+
 observation_sample_iaf_packed = PackedSequence(
     observation_sample_iaf,
     batch_sizes,
@@ -230,6 +233,47 @@ for k, i in enumerate(emph_index):
     axes[2][2].plot(decoded_iaf.detach().numpy(), color = f'C{k}', linestyle='dashed')
     axes[2][2].plot(target.detach().numpy(), color = f'C{k}')
 
+
+axes[0][0].set_ylabel('RAE')
+axes[0][1].set_ylabel('')
+axes[0][2].set_ylabel('')
+axes[1][0].set_ylabel('RVAE')
+axes[1][1].set_ylabel('')
+axes[1][2].set_ylabel('')
+axes[2][0].set_ylabel('RVAE /w IAF')
+axes[2][1].set_ylabel('')
+axes[2][2].set_ylabel('')
+
+
+axes[0][0].set_xlabel('Latent Space')
+axes[0][1].set_xlabel('Posterior distribution for selected samples')
+axes[0][2].set_xlabel('Reconstruction vs Orginal')
+axes[1][0].set_xlabel('')
+axes[1][1].set_xlabel('')
+axes[1][2].set_xlabel('')
+axes[2][0].set_xlabel('')
+axes[2][1].set_xlabel('')
+axes[2][2].set_xlabel('')
+
+axes[0][0].xaxis.set_label_position('top') 
+axes[0][1].xaxis.set_label_position('top') 
+axes[0][2].xaxis.set_label_position('top') 
+
 fig.tight_layout()
 fig.savefig(overleaf_directory / "figures" / "toy_examples" / "toy_performance.pdf")
 fig.savefig(figure_directory / "toy_performance.pdf")
+
+
+# %%
+
+
+# %%
+
+
+# %%
+
+
+# %%
+
+
+# %%
