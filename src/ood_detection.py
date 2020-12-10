@@ -144,6 +144,9 @@ for x in tqdm(word_loader_trump):
     
 torch.save([ll_in_distribution, ll_out_of_distribution], "ood_results.pkl")
 
+ll_in_distribution, ll_out_of_distribution = torch.load("./ood_results.pkl")
+
+
 fig, _ = plt.subplots(ncols=3, nrows=2, figsize=(14, 6))
 
 
@@ -154,17 +157,22 @@ for i, ((model, ood_dist), (_, id_dist)) in enumerate(
     )
 ):
     
-    sns.distplot(id_dist, label="Iid", ax=fig.axes[i], kde=False)
 
     # Only considering obervations within a reasonable intervand
-    max_ood = max(id_dist) + 1
-    min_ood = min(id_dist) - 3
+    min_ood, max_ood = np.quantile(ood_dist,(0.005, 0.999)) 
+    min_id, max_id = np.quantile(id_dist,(0.005, 0.999)) 
 
     ood_filtered = [x for x in ood_dist if x < max_ood and x > min_ood]
-    sns.distplot(ood_filtered, label="Trump", ax=fig.axes[i], kde=False)
+    id_filtered = [x for x in id_dist if x < max_id and x > min_id]
+
+    sns.distplot(id_filtered, label="Covid", ax=fig.axes[i], kde=False,
+        norm_hist=True)
+    sns.distplot(ood_filtered, label="Trump", ax=fig.axes[i], kde=False,
+        norm_hist=True)
     fig.axes[i].set_title(model)
     
 
+plt.legend()
 
 
 fig.tight_layout()
