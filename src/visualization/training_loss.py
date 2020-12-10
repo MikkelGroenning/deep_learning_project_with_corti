@@ -57,11 +57,11 @@ for i, (t_info, model_desc) in enumerate([
         fig.axes[i].set_ylabel("loss (-ELBO(beta=0.1))")
         fig.axes[i].set_ylim(330, 370)
     if i == 3:
-        fig.axes[i].set_ylim(42, 70)
+        fig.axes[i].set_ylim(35, 70)
         fig.axes[i].set_ylabel("loss (MSE)")
     if i in (4, 5):
         fig.axes[i].set_ylabel("loss (-ELBO(beta=0.1))")
-        fig.axes[i].set_ylim(-8000, 2000)
+        fig.axes[i].set_ylim(-10000, 10000)
 
 leg1 = mpatches.Patch(color='C0')
 leg2 = mpatches.Patch(color='C1')
