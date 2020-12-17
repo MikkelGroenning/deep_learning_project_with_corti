@@ -141,6 +141,8 @@ class ModelTrainer(ABC):
 
         for epoch in epoch_iter:
 
+            self.epoch_callback()
+
             # Track loss per batch
             epoch_training_loss = []
             epoch_validation_loss = []
@@ -261,7 +263,41 @@ class ModelTrainer(ABC):
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
                         state[k] = v.cuda()
+    
+    def epoch_callback(self):
+        pass
 
+class VITrainer(ModelTrainer):
+    def __init__(self, vi, *args, beta_scheduler=None, **kwargs):
+
+        super(VITrainer, self).__init__(*args, **kwargs)
+        self.vi = vi
+        self.beta_scheduler = beta_scheduler
+
+    def get_loss(self, x):
+
+        loss, _, _ = self.vi(self.model, x)
+        return loss
+
+    def epoch_callback(self):
+        """ gets called before epoch """
+        if self.beta_scheduler is not None:        
+            i = self.current_epoch+1
+            self.vi.beta = self.beta_scheduler(i)
+
+
+class CriterionTrainer(ModelTrainer):
+    def __init__(self, criterion, *args, **kwargs):
+
+        super(CriterionTrainer, self).__init__(*args, **kwargs)
+        self.criterion = criterion
+
+    def get_loss(self, x):
+
+        output = self.model(x)
+        loss = self.criterion(output.data, x.data) / x.batch_sizes[0]
+
+        return loss
 
 def _get_checkpoint(model_name, device):
 
@@ -392,33 +428,6 @@ def actual_decode_similarity(sample, target, embedding):
         target: cos_sim_target / counter,
         average: cos_sim_avg / counter,
     }
-
-
-class VITrainer(ModelTrainer):
-    def __init__(self, vi, *args, **kwargs):
-
-        super(VITrainer, self).__init__(*args, **kwargs)
-        self.vi = vi
-
-    def get_loss(self, x):
-
-        loss, _, _ = self.vi(self.model, x)
-
-        return loss
-
-
-class CriterionTrainer(ModelTrainer):
-    def __init__(self, criterion, *args, **kwargs):
-
-        super(CriterionTrainer, self).__init__(*args, **kwargs)
-        self.criterion = criterion
-
-    def get_loss(self, x):
-
-        output = self.model(x)
-        loss = self.criterion(output.data, x.data) / x.batch_sizes[0]
-
-        return loss
 
 # Encoder defition
 class Encoder(Module):

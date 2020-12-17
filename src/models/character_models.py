@@ -1,4 +1,5 @@
 import argparse
+from math import exp
 
 from src.data.characters import TwitterDataChars, alphabet
 from src.models.common import CriterionTrainer, VariationalInference, VITrainer
@@ -78,7 +79,7 @@ def train_vrae(retrain=False):
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VariationalInference(0.1)
+    vi = VariationalInference()
     optimizer = Adam(character_vrae.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
@@ -89,6 +90,7 @@ def train_vrae(retrain=False):
         training_data=train_data,
         validation_data=validation_data,
         clip_max_norm=0.25,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
     )
     mt.model_name = "CharacterVRAE"
     if not retrain:
@@ -102,7 +104,7 @@ def train_vrae_iaf(retrain=False):
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VariationalInference(0.1)
+    vi = VariationalInference()
     optimizer = Adam(character_vrae_iaf.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
@@ -113,6 +115,7 @@ def train_vrae_iaf(retrain=False):
         training_data=train_data,
         validation_data=validation_data,
         clip_max_norm=0.25,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
     )
     mt.model_name = "CharacterVRAEIAF"
     if not retrain:
