@@ -9,6 +9,7 @@ from src.models.rae import RAE
 from src.models.vrae import VRAE
 from torch.nn import MSELoss
 from torch.optim import Adam
+from math import exp
 
 seed = 42
 
@@ -27,7 +28,7 @@ validation_data = Continuous(num_observations=2000, **data_parameters)
 test_data = Continuous(num_observations=1000, **data_parameters)
 
 batch_size = 100
-max_epochs = 800
+max_epochs = 10
 
 # Recurrent Autoencoder
 rae = RAE(
@@ -58,25 +59,25 @@ vrae_iaf = VRAEIAF(
 
 if __name__ == "__main__":
 
-    # Recurrent Autoencoder
-    optimizer_parameters = {
-        "lr": 0.0005,
-    }
-    criterion = MSELoss(reduction="sum")
-    optimizer = Adam(rae.parameters(), **optimizer_parameters)
-    mt = CriterionTrainer(
-        criterion=criterion,
-        model=rae,
-        optimizer=optimizer,
-        batch_size=batch_size,
-        max_epochs=min(max_epochs,500),
-        training_data=train_data,
-        validation_data=test_data,
-        clip_max_norm=0.15,
-    )
-    mt.model_name = "ToyRAE"
-    mt.restore_checkpoint()
-    mt.train()
+    # # Recurrent Autoencoder
+    # optimizer_parameters = {
+    #     "lr": 0.0005,
+    # }
+    # criterion = MSELoss(reduction="sum")
+    # optimizer = Adam(rae.parameters(), **optimizer_parameters)
+    # mt = CriterionTrainer(
+    #     criterion=criterion,
+    #     model=rae,
+    #     optimizer=optimizer,
+    #     batch_size=batch_size,
+    #     max_epochs=min(max_epochs,500),
+    #     training_data=train_data,
+    #     validation_data=test_data,
+    #     clip_max_norm=0.15,
+    # )
+    # mt.model_name = "ToyRAE"
+    # mt.restore_checkpoint()
+    # mt.train()
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
@@ -93,6 +94,7 @@ if __name__ == "__main__":
         training_data=train_data,
         validation_data=test_data,
         clip_max_norm=0.15,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
     )
     mt.model_name = "ToyVRAE"
     mt.restore_checkpoint()
@@ -113,6 +115,7 @@ if __name__ == "__main__":
         training_data=train_data,
         validation_data=test_data,
         clip_max_norm=0.15,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
     )
     mt.model_name = "ToyVRAEIAF"
     mt.restore_checkpoint()
