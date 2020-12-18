@@ -15,7 +15,7 @@ import argparse
 data = torch.load("data/processed/200316_embedding.pkl")
 embedding_dim = 300
 
-batch_size = 64
+batch_size = 128
 max_epochs = 500
 
 train_data = TwitterDataWords(data["train"])
@@ -71,7 +71,7 @@ def train_rae(retrain=False):
     mt.model_name = "WordRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae(retrain=False):
@@ -96,7 +96,7 @@ def train_vrae(retrain=False):
     mt.model_name = "WordVRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae_iaf(retrain=False):
@@ -121,7 +121,7 @@ def train_vrae_iaf(retrain=False):
     mt.model_name = "WordVRAEIAF"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 if __name__ == "__main__":
