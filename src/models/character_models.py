@@ -12,7 +12,7 @@ from torch.optim import Adam
 from src.data.common import data_train, data_validation, data_test, data_trump
 
 batch_size = 64
-max_epochs = 500
+max_epochs = 1000
 
 train_data = TwitterDataChars(data_train.copy())
 validation_data = TwitterDataChars(data_validation.copy())
@@ -90,7 +90,7 @@ def train_vrae(retrain=False):
         training_data=train_data,
         validation_data=validation_data,
         clip_max_norm=0.25,
-        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
+        beta_scheduler=lambda i: 1/(1+exp(-(i-500)/43))
     )
     mt.model_name = "CharacterVRAE"
     if not retrain:
@@ -115,12 +115,12 @@ def train_vrae_iaf(retrain=False):
         training_data=train_data,
         validation_data=validation_data,
         clip_max_norm=0.25,
-        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
+        beta_scheduler=lambda i: 1/(1+exp(-(i-500)/43))
     )
     mt.model_name = "CharacterVRAEIAF"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 if __name__ == "__main__":
 
