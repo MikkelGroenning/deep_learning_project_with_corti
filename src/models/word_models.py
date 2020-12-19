@@ -71,7 +71,7 @@ def train_rae(retrain=False):
     mt.model_name = "WordRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae(retrain=False):
@@ -96,7 +96,7 @@ def train_vrae(retrain=False):
     mt.model_name = "WordVRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae_iaf(retrain=False):
@@ -121,7 +121,7 @@ def train_vrae_iaf(retrain=False):
     mt.model_name = "WordVRAEIAF"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 if __name__ == "__main__":

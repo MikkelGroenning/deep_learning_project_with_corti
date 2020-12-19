@@ -70,7 +70,7 @@ def train_rae(retrain=False):
     mt.model_name = "CharacterRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae(retrain=False):
@@ -95,7 +95,7 @@ def train_vrae(retrain=False):
     mt.model_name = "CharacterVRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae_iaf(retrain=False):
