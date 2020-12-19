@@ -24,15 +24,23 @@ from src.models.word_models import word_rae, word_vrae, word_vrae_iaf, MSELoss
 
 sns.set_style("whitegrid")
 
-overleaf_directory = Path( 'overleaf' ) / "poster" 
+overleaf_directory = Path("overleaf") / "poster"
 
-character_rae = get_trained_model(character_rae, model_name="CharacterRAE")
-character_vrae = get_trained_model(character_vrae, model_name="CharacterVRAE")
-character_vrae_iaf = get_trained_model(character_vrae_iaf, model_name="CharacterVRAEIAF")
+character_rae = get_trained_model(
+    character_rae, model_name="CharacterRAE", subdir="poster-models"
+)
+character_vrae = get_trained_model(
+    character_vrae, model_name="CharacterVRAE", subdir="poster-models"
+)
+character_vrae_iaf = get_trained_model(
+    character_vrae_iaf, model_name="CharacterVRAEIAF", subdir="poster-models"
+)
 
-word_rae = get_trained_model(word_rae, model_name="WordRAE")
-word_vrae = get_trained_model(word_vrae, model_name="WordVRAE")
-word_vrae_iaf = get_trained_model(word_vrae_iaf, model_name="WordVRAEIAF")
+word_rae = get_trained_model(word_rae, model_name="WordRAE", subdir="poster-models")
+word_vrae = get_trained_model(word_vrae, model_name="WordVRAE", subdir="poster-models")
+word_vrae_iaf = get_trained_model(
+    word_vrae_iaf, model_name="WordVRAEIAF", subdir="poster-models"
+)
 
 character_loader = get_loader(test_data_characters, 1)
 word_loader = get_loader(test_data_words, 1)
@@ -67,14 +75,56 @@ ll_out_of_distribution = {
     "word_vrae_iaf": [],
 }
 
-elbo = {
-    "character_vrae": [],
-    "character_vrae_iaf": [],
-    "word_vrae": [],
-    "word_vrae_iaf": [],
+diagnostics_in_distribution = {
+    "sequence_lengths": [],
+    "character_vrae": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
+    "character_vrae_iaf": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
+    "word_vrae": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
+    "word_vrae_iaf": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
 }
 
-for x in tqdm(character_loader):
+diagnostics_out_of_distribution = {
+    "character_vrae": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
+    "character_vrae_iaf": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
+    "word_vrae": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
+    "word_vrae_iaf": {
+        "elbo": [],
+        "log_px": [],
+        "kl": [],
+    },
+}
+
+
+# for x in tqdm(character_loader):
+for x, _ in zip(tqdm(character_loader), range(100)):
 
     loss_packed_rae = ce_loss(character_rae(x).data, x.data)
     loss_packed_vrae, diag_vrae, _ = vi(character_vrae, x)
@@ -84,97 +134,135 @@ for x in tqdm(character_loader):
         -float(loss_packed_rae) / len(x.data),
     )
     ll_in_distribution["character_vrae"].append(
-        -float(loss_packed_vrae) / len(x.data),
+        float(diag_vrae["elbo"]) / len(x.data),
     )
     ll_in_distribution["character_vrae_iaf"].append(
-        -float(loss_packed_vrae_iaf) / len(x.data)
+        float(diag_vrae_iaf["elbo"]) / len(x.data),
     )
 
-    elbo["character_vrae"]
-    elbo["character_vrae_iaf"]
+    diagnostics_in_distribution["character_vrae"]["elbo"].append(float(diag_vrae["elbo"]))
+    diagnostics_in_distribution["character_vrae"]["log_px"].append(float(diag_vrae["log_px"]))
+    diagnostics_in_distribution["character_vrae"]["kl"].append(float(diag_vrae["kl"]))
 
-for x in tqdm(character_loader_trump):
+    diagnostics_in_distribution["character_vrae_iaf"]["elbo"].append(float(diag_vrae_iaf["elbo"]))
+    diagnostics_in_distribution["character_vrae_iaf"]["log_px"].append(float(diag_vrae_iaf["log_px"]))
+    diagnostics_in_distribution["character_vrae_iaf"]["kl"].append(float(diag_vrae_iaf["kl"]))
+
+# for x in tqdm(character_loader_trump):
+for x, _ in zip(tqdm(character_loader_trump), range(100)):
 
     loss_packed_rae = ce_loss(character_rae(x).data, x.data)
-    loss_packed_vrae, _, _ = vi(character_vrae, x)
-    loss_packed_vrae_iaf, diagnostics, _ = vi(character_vrae_iaf, x)
+    loss_packed_vrae, diag_vrae, _ = vi(character_vrae, x)
+    loss_packed_vrae_iaf, diag_vrae_iaf, _ = vi(character_vrae_iaf, x)
 
     ll_out_of_distribution["character_rae"].append(
         -float(loss_packed_rae) / len(x.data),
     )
     ll_out_of_distribution["character_vrae"].append(
-        -float(loss_packed_vrae) / len(x.data),
+        float(diag_vrae["elbo"]) / len(x.data),
     )
     ll_out_of_distribution["character_vrae_iaf"].append(
-        -float(loss_packed_vrae_iaf) / len(x.data)
+        float(diag_vrae_iaf["elbo"]) / len(x.data),
     )
 
+    diagnostics_out_of_distribution["character_vrae"]["elbo"].append(float(diag_vrae["elbo"]))
+    diagnostics_out_of_distribution["character_vrae"]["log_px"].append(float(diag_vrae["log_px"]))
+    diagnostics_out_of_distribution["character_vrae"]["kl"].append(float(diag_vrae["kl"]))
 
-for x in tqdm(word_loader):
+    diagnostics_out_of_distribution["character_vrae_iaf"]["elbo"].append(float(diag_vrae_iaf["elbo"]))
+    diagnostics_out_of_distribution["character_vrae_iaf"]["log_px"].append(float(diag_vrae_iaf["log_px"]))
+    diagnostics_out_of_distribution["character_vrae_iaf"]["kl"].append(float(diag_vrae_iaf["kl"]))
+
+
+# for x in tqdm(word_loader):
+for x, _ in zip(tqdm(word_loader), range(100)):
 
     loss_packed_rae = mse_loss(word_rae(x).data, x.data)
-    loss_packed_vrae, _, _ = vi(word_vrae, x)
-    loss_packed_vrae_iaf, diagnostics, _ = vi(word_vrae_iaf, x)
+    loss_packed_vrae, diag_vrae, _ = vi(word_vrae, x)
+    loss_packed_vrae_iaf, diag_vrae_iaf, _ = vi(word_vrae_iaf, x)
 
     ll_in_distribution["word_rae"].append(
         -float(loss_packed_rae) / len(x.data),
     )
     ll_in_distribution["word_vrae"].append(
-        -float(loss_packed_vrae) / len(x.data),
+        float(diag_vrae["elbo"]) / len(x.data),
     )
     ll_in_distribution["word_vrae_iaf"].append(
-        -float(loss_packed_vrae_iaf) / len(x.data)
+        float(diag_vrae_iaf["elbo"]) / len(x.data),
     )
 
-for x in tqdm(word_loader_trump):
+    diagnostics_in_distribution["word_vrae"]["elbo"].append(float(diag_vrae["elbo"]))
+    diagnostics_in_distribution["word_vrae"]["log_px"].append(float(diag_vrae["log_px"]))
+    diagnostics_in_distribution["word_vrae"]["kl"].append(float(diag_vrae["kl"]))
+
+    diagnostics_in_distribution["word_vrae_iaf"]["elbo"].append(float(diag_vrae_iaf["elbo"]))
+    diagnostics_in_distribution["word_vrae_iaf"]["log_px"].append(float(diag_vrae_iaf["log_px"]))
+    diagnostics_in_distribution["word_vrae_iaf"]["kl"].append(float(diag_vrae_iaf["kl"]))
+
+
+# for x in tqdm(word_loader_trump):
+for x, _ in zip(tqdm(word_loader_trump), range(100)):
 
     loss_packed_rae = mse_loss(word_rae(x).data, x.data)
-    loss_packed_vrae, _, _ = vi(word_vrae, x)
-    loss_packed_vrae_iaf, diagnostics, _ = vi(word_vrae_iaf, x)
+    loss_packed_vrae, diag_vrae, _ = vi(word_vrae, x)
+    loss_packed_vrae_iaf, diag_vrae_iaf, _ = vi(word_vrae_iaf, x)
 
     ll_out_of_distribution["word_rae"].append(
         -float(loss_packed_rae) / len(x.data),
     )
     ll_out_of_distribution["word_vrae"].append(
-        -float(loss_packed_vrae) / len(x.data),
+        float(diag_vrae["elbo"]) / len(x.data),
     )
     ll_out_of_distribution["word_vrae_iaf"].append(
-        -float(loss_packed_vrae_iaf) / len(x.data)
+        float(diag_vrae_iaf["elbo"]) / len(x.data),
     )
-    
-torch.save([ll_in_distribution, ll_out_of_distribution], "ood_results.pkl")
 
-ll_in_distribution, ll_out_of_distribution = torch.load("./ood_results.pkl")
+    diagnostics_out_of_distribution["word_vrae"]["elbo"].append(float(diag_vrae["elbo"]))
+    diagnostics_out_of_distribution["word_vrae"]["log_px"].append(float(diag_vrae["log_px"]))
+    diagnostics_out_of_distribution["word_vrae"]["kl"].append(float(diag_vrae["kl"]))
+    diagnostics_out_of_distribution["word_vrae_iaf"]["elbo"].append(float(diag_vrae_iaf["elbo"]))
+    diagnostics_out_of_distribution["word_vrae_iaf"]["log_px"].append(float(diag_vrae_iaf["log_px"]))
+    diagnostics_out_of_distribution["word_vrae_iaf"]["kl"].append(float(diag_vrae_iaf["kl"]))
 
+torch.save(
+    {
+        "ll_in_distribution": ll_in_distribution,
+        "ll_out_of_distribution": ll_out_of_distribution,
+        "diagnostics_in_distribution": diagnostics_in_distribution,
+        "diagnostics_out_of_distribution": diagnostics_out_of_distribution,
+    },
+    Path(".") / "reports" / "init_ood_results.pkl",
+)
 
-fig, _ = plt.subplots(ncols=3, nrows=2, figsize=(14, 6))
+if False:
 
+    ll_in_distribution, ll_out_of_distribution = torch.load("./ood_results.pkl")
 
-for i, ((model, ood_dist), (_, id_dist)) in enumerate(
-    zip(
-        ll_out_of_distribution.items(),
-        ll_in_distribution.items(),
-    )
-):
-    
+    fig, _ = plt.subplots(ncols=3, nrows=2, figsize=(14, 6))
 
-    # Only considering obervations within a reasonable intervand
-    min_ood, max_ood = np.quantile(ood_dist,(0.005, 0.999)) 
-    min_id, max_id = np.quantile(id_dist,(0.005, 0.999)) 
+    for i, ((model, ood_dist), (_, id_dist)) in enumerate(
+        zip(
+            ll_out_of_distribution.items(),
+            ll_in_distribution.items(),
+        )
+    ):
 
-    ood_filtered = [x for x in ood_dist if x < max_ood and x > min_ood]
-    id_filtered = [x for x in id_dist if x < max_id and x > min_id]
+        # Only considering obervations within a reasonable intervand
+        min_ood, max_ood = np.quantile(ood_dist, (0.005, 0.999))
+        min_id, max_id = np.quantile(id_dist, (0.005, 0.999))
 
-    sns.distplot(id_filtered, label="Covid", ax=fig.axes[i], kde=False,
-        norm_hist=True)
-    sns.distplot(ood_filtered, label="Trump", ax=fig.axes[i], kde=False,
-        norm_hist=True)
-    fig.axes[i].set_title(model)
-    
+        ood_filtered = [x for x in ood_dist if x < max_ood and x > min_ood]
+        id_filtered = [x for x in id_dist if x < max_id and x > min_id]
 
-plt.legend()
+        sns.distplot(
+            id_filtered, label="Covid", ax=fig.axes[i], kde=False, norm_hist=True
+        )
+        sns.distplot(
+            ood_filtered, label="Trump", ax=fig.axes[i], kde=False, norm_hist=True
+        )
+        fig.axes[i].set_title(model)
 
+    plt.legend()
 
-fig.tight_layout()
-fig.savefig(overleaf_directory /"figures" / "ood_detection.pdf") 
-
+    fig.tight_layout()
+    fig.savefig(overleaf_directory / "figures" / "ood_detection.pdf")

@@ -299,11 +299,16 @@ class CriterionTrainer(ModelTrainer):
 
         return loss
 
-def _get_checkpoint(model_name, device):
+def _get_checkpoint(model_name, device, subdir=None):
+
+    if subdir is not None:
+        model_directory_ = model_directory / subdir
+    else:
+        model_directory_ = model_directory
 
     try:
         checkpoint = torch.load(
-            model_directory / model_name / "checkpoint.pt",
+            model_directory_ / model_name / "checkpoint.pt",
             map_location=device,
         )
         return checkpoint
@@ -311,13 +316,17 @@ def _get_checkpoint(model_name, device):
         return None
 
 
-def get_trained_model(model, training_info=False, model_name=None):
+def get_trained_model(model, training_info=False, model_name=None, latest=False, subdir=None):
 
     if model_name is None:
         model_name = model.__class__.__name__
 
-    checkpoint = _get_checkpoint(model_name, device)
-    model.load_state_dict(checkpoint["best_model"]["state_dict"])
+    checkpoint = _get_checkpoint(model_name, device, subdir=subdir)
+
+    if not latest:
+        model.load_state_dict(checkpoint["best_model"]["state_dict"])
+    else:
+        model.load_state_dict(checkpoint["model_state_dict"])
 
     if training_info:
         return (
