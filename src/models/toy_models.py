@@ -9,6 +9,7 @@ from src.models.rae import RAE
 from src.models.vrae import VRAE
 from torch.nn import MSELoss
 from torch.optim import Adam
+from math import exp
 
 seed = 42
 
@@ -27,7 +28,7 @@ validation_data = Continuous(num_observations=2000, **data_parameters)
 test_data = Continuous(num_observations=1000, **data_parameters)
 
 batch_size = 100
-max_epochs = 800
+max_epochs = 500
 
 # Recurrent Autoencoder
 rae = RAE(
@@ -76,7 +77,7 @@ if __name__ == "__main__":
     )
     mt.model_name = "ToyRAE"
     mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
     # Variational Recurrent Autoencoder
     optimizer_parameters = {
@@ -93,10 +94,11 @@ if __name__ == "__main__":
         training_data=train_data,
         validation_data=test_data,
         clip_max_norm=0.15,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
     )
     mt.model_name = "ToyVRAE"
     mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
     # Variational Recurrent Autoencoder using IAF
     optimizer_parameters = {
@@ -113,7 +115,8 @@ if __name__ == "__main__":
         training_data=train_data,
         validation_data=test_data,
         clip_max_norm=0.15,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-250)/20))
     )
     mt.model_name = "ToyVRAEIAF"
     mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')

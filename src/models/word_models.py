@@ -1,5 +1,6 @@
 
 
+from math import exp
 import torch
 from src.data.words import TwitterDataWords
 from src.models.common import CriterionTrainer, VariationalInference, VITrainer
@@ -15,7 +16,7 @@ data = torch.load("data/processed/200316_embedding.pkl")
 embedding_dim = 300
 
 batch_size = 64
-max_epochs = 500
+max_epochs = 1000
 
 train_data = TwitterDataWords(data["train"])
 validation_data = TwitterDataWords(data["validation"])
@@ -65,12 +66,12 @@ def train_rae(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.25,
+        clip_max_norm=0.15,
     )
     mt.model_name = "WordRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae(retrain=False):
@@ -79,7 +80,7 @@ def train_vrae(retrain=False):
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VariationalInference(0.1)
+    vi = VariationalInference()
     optimizer = Adam(word_vrae.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
@@ -89,12 +90,13 @@ def train_vrae(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.25,
+        clip_max_norm=0.15,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-500)/43))
     )
     mt.model_name = "WordVRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae_iaf(retrain=False):
@@ -103,7 +105,7 @@ def train_vrae_iaf(retrain=False):
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VariationalInference(0.1)
+    vi = VariationalInference()
     optimizer = Adam(word_vrae_iaf.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
@@ -113,12 +115,13 @@ def train_vrae_iaf(retrain=False):
         max_epochs=max_epochs,
         training_data=train_data,
         validation_data=validation_data,
-        clip_max_norm=0.25,
+        clip_max_norm=0.15,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-500)/43))
     )
     mt.model_name = "WordVRAEIAF"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 if __name__ == "__main__":

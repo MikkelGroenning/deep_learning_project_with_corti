@@ -11,13 +11,13 @@ from src.models.character_models import (
 from src.models.common import VariationalInference, get_trained_model
 
 rae, t_info_rae = get_trained_model(
-    rae, training_info=True, model_name="CharacterRAE"
+    rae, training_info=True, model_name="CharacterRAE", subdir="beta-scheduling", latest=False,
 )
 vrae, t_info_rae = get_trained_model(
-    vrae, training_info=True, model_name="CharacterVRAE"
+    vrae, training_info=True, model_name="CharacterVRAE", subdir="beta-scheduling", latest=True,
 )
 vrae_iaf, t_info_rae = get_trained_model(
-    vrae_iaf, training_info=True, model_name="CharacterVRAEIAF"
+    vrae_iaf, training_info=True, model_name="CharacterVRAEIAF", subdir="beta-scheduling", latest=True,
 )
 
 num_samples = 5
@@ -40,7 +40,7 @@ sample_iaf_padded, sequence_lengths = pad_packed_sequence(sample_iaf_packed)
 
 target_padded, _ = pad_packed_sequence(x_test)
 
-slc = slice(None, 100)
+slc = slice(None)
 
 for i, length in zip(range(num_samples), sequence_lengths):
 

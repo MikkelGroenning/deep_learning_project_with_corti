@@ -1,4 +1,5 @@
 import argparse
+from math import exp
 
 from src.data.characters import TwitterDataChars, alphabet
 from src.models.common import CriterionTrainer, VariationalInference, VITrainer
@@ -11,7 +12,7 @@ from torch.optim import Adam
 from src.data.common import data_train, data_validation, data_test, data_trump
 
 batch_size = 64
-max_epochs = 500
+max_epochs = 1000
 
 train_data = TwitterDataChars(data_train.copy())
 validation_data = TwitterDataChars(data_validation.copy())
@@ -69,7 +70,7 @@ def train_rae(retrain=False):
     mt.model_name = "CharacterRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae(retrain=False):
@@ -78,7 +79,7 @@ def train_vrae(retrain=False):
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VariationalInference(0.1)
+    vi = VariationalInference()
     optimizer = Adam(character_vrae.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
@@ -89,11 +90,12 @@ def train_vrae(retrain=False):
         training_data=train_data,
         validation_data=validation_data,
         clip_max_norm=0.25,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-500)/43))
     )
     mt.model_name = "CharacterVRAE"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 
 def train_vrae_iaf(retrain=False):
@@ -102,7 +104,7 @@ def train_vrae_iaf(retrain=False):
     optimizer_parameters = {
         "lr": 0.001,
     }
-    vi = VariationalInference(0.1)
+    vi = VariationalInference()
     optimizer = Adam(character_vrae_iaf.parameters(), **optimizer_parameters)
     mt = VITrainer(
         vi=vi,
@@ -113,11 +115,12 @@ def train_vrae_iaf(retrain=False):
         training_data=train_data,
         validation_data=validation_data,
         clip_max_norm=0.25,
+        beta_scheduler=lambda i: 1/(1+exp(-(i-500)/43))
     )
     mt.model_name = "CharacterVRAEIAF"
     if not retrain:
         mt.restore_checkpoint()
-    mt.train()
+    mt.train(progress_bar='epoch')
 
 if __name__ == "__main__":
 
