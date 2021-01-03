@@ -11,7 +11,7 @@ Deep learning project in course 02456 Deep Learning at DTU in collaboration with
 ## Short installation guide
 
 1. Download/clone repository
-2. Create virtual environment through `conda env create -n dl-corti` command 
+2. From the repository root, create a virtual environment through the `conda env create -n dl-corti` command 
 3. Activate conda environment using `conda activate dl-corti`
-4. Download and unzip `models` and `data` files and place the corresponding folders in the repository root.
+4. Download and unzip `models.zip` and `data.zip` files (link found in report appendix) and replace the corresponding folders in the repository root.
 5. Run eg. `python src/reconstructions.py`
